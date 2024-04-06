@@ -1,0 +1,17 @@
+// Query to identify multiple distinct user account authentication attempts from the same IP address
+// We remove events occurring from safe IP ranges and any known password spraying noise
+let safeRanges = toscalar(_GetWatchlist('OwnedCIDRs')| summarize make_list(SearchKey));
+let outliers = dynamic(["8.8.8.8"]); // add to this list as needed/confirm IP is safe
+OktaSSO
+| where eventType_s has "user.session.start"
+| join kind=leftanti ( OktaSSO | where eventType_s == "security.threat.detected" or actor_displayName_s =~ "unknown" 
+) on client_ipAddress_s
+| where actor_alternateId_s != @"system@okta.com" and actor_alternateId_s contains "@"
+// let's tag the events occurring internally
+| extend internal = (ipv4_is_in_any_range(client_ipAddress_s, safeRanges))
+| where internal == "false"
+| where client_ipAddress_s !in (outliers)
+| summarize make_set(actor_alternateId_s) by client_ipAddress_s
+| extend Count = array_length(set_actor_alternateId_s)
+| where Count > 1
+| sort by Count desc

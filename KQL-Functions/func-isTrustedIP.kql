@@ -1,0 +1,17 @@
+// this function takes a string input (ip) and checks it against a watchlist that you define
+// returns 'true' if the IP address provided is within one of the IP ranges defined in your watchlist and 'false' otherwise
+// ensure the searchkey of the watchlist is set to the column containing the CIDR notated IPs or modify accordingly
+//
+let trustedRanges = toscalar(_GetWatchlist('trustedNetworks')| summarize make_list(SearchKey));
+let isTrustedIP=(ip:string) {
+ipv4_is_in_any_range(ip,trustedRanges)
+};
+isTrustedIP(ip)
+
+
+-------------------------------------------------------------------------------
+Example use-case:
+OktaSSO
+| where outcome_reason_s == "INVALID_CREDENTIALS" 
+| extend internal = isTrustedIP( client_ipAddress_s)
+| project actor_alternateId_s, client_ipAddress_s, internal
