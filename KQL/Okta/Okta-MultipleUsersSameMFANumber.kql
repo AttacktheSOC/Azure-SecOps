@@ -1,0 +1,12 @@
+//Query your Okta custom logs for any phone numbers that have been registered to multiple users for MFA
+//Data connector required for this query - Okta Single Sign-On (using Azure Function)
+//Query inspired by @reprise99 - https://github.com/reprise99/Sentinel-Queries/blob/main/Azure%20Active%20Directory/Audit-MultipleUsersSameMFANumber.kql
+Okta_CL
+| where TimeGenerated > ago (30d)
+| where eventType_s =~ "system.sms.send_factor_verify_message"
+| extend UserPrincipalName = tostring(parse_json(todynamic(target_s)[0].alternateId))
+| extend PhoneNumber = tostring(parse_json(todynamic(target_s)[1].alternateId))
+| where isnotempty(PhoneNumber)
+| summarize Users=make_set(UserPrincipalName) by PhoneNumber
+| extend CountofUsers=array_length(Users)
+| where CountofUsers > 1

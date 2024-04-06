@@ -1,0 +1,14 @@
+// Detect an Okta AD Agent API Token generation event 
+// Though this can be legitimate administration, there's a chance this is an Okta AD Agent Hijacking attempt
+// Confirm with the admin in the alert
+// Inspired by this blog post @TrustedSec: https://trustedsec.com/blog/okta-for-red-teamers
+Okta_CL
+| where eventType_s =~ "system.api_token.create"
+| extend ClientAppID = parse_json(tostring(parse_json(target_s)[0].detailEntry)).clientAppId
+| where ClientAppID == "cappT0Hfy97F1BoO1UTR" // Client App ID for the Okta AD Agent
+| project
+    TimeGenerated,
+    ClientAppID,
+    UserAccount = actor_alternateId_s,
+    UserName = actor_displayName_s,
+    DevTokenHash = debugContext_debugData_dtHash_s

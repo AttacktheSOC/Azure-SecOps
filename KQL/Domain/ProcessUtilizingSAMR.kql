@@ -1,0 +1,15 @@
+// Find processes that sent SAMR queries to Active Directory
+// This is an updated version of the query "Active Directory using SAMR" located in Shared Queries/Suggested/Microsoft365Defender
+IdentityQueryEvents
+| where Timestamp > ago(30d)
+| where ActionType == "SAMR query" and isnotempty( AccountName)
+| project QueryTime = Timestamp, DeviceName, AccountName, Query, QueryTarget 
+| join kind=inner (
+DeviceProcessEvents 
+| where Timestamp > ago(30d)
+| where (InitiatingProcessCommandLine has "net " or ProcessCommandLine has "net ") or (InitiatingProcessCommandLine contains "wmic" and
+InitiatingProcessCommandLine contains "useraccount") or (ProcessCommandLine contains "wmic" and ProcessCommandLine contains "useraccount")
+| project ProcessCreationTime = Timestamp, DeviceName, AccountName, InitiatingProcessFileName , InitiatingProcessCommandLine, ProcessCommandLine
+) on DeviceName, AccountName
+| where ProcessCreationTime - QueryTime between (-2m .. 2m)
+| project QueryTime, DeviceName, AccountName, InitiatingProcessFileName, InitiatingProcessCommandLine, ProcessCommandLine, QueryTarget
