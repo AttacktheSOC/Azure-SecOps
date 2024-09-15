@@ -1,0 +1,13 @@
+// initliaze a list of APT favorite binaries
+let susProcs = dynamic(["route.exe", "quser.exe", "curl.exe", "setspn.exe", "klist.exe"]);
+let events =
+DeviceProcessEvents
+| where ProcessVersionInfoOriginalFileName in (susProcs)
+| project DeviceName, Timestamp, FileName;
+events
+| sort by DeviceName, Timestamp asc 
+// Create session IDs within a 5 minute window of the first event of a session or the previous event of the same session and device name
+| extend EventSessionId = row_window_session(Timestamp, 5m, 5m, DeviceName != prev(DeviceName))
+| summarize EventCount = dcount(FileName), Binaries = make_set(FileName), MinTimestamp = min(Timestamp), MaxTimestamp = max(Timestamp) by DeviceName, EventSessionId // Group by DeviceName and EventSessionId
+| where EventCount >= 3
+| order by DeviceName, MinTimestamp asc
