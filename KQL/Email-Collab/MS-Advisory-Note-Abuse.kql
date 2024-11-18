@@ -1,0 +1,9 @@
+let firstPartyDomains = dynamic(["office.com", "azure.net", "microsoft.com", "azure.com", "aka.ms", "bing.com", "cloud.microsoft", "windowsazure.com", "microsoft365.com"]);
+let emailIDs = EmailEvents
+| where SenderFromAddress =~ @"o365mc@microsoft.com"
+| project NetworkMessageId;
+EmailUrlInfo
+| where NetworkMessageId in (emailIDs)
+| extend host_parts = split(UrlDomain, ".")
+| extend Domain = strcat(tostring(host_parts[-2]), ".", tostring(host_parts[-1]))
+| where UrlLocation == "Body" and Domain !in (firstPartyDomains)
