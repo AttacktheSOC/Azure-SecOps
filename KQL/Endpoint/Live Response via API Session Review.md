@@ -13,7 +13,7 @@
 *this query still needs work and testing* - *Dylan 11-27-2024*
 
 Correlates commands run during a Live Response session initiated via API on individual endpoints using the row_window_session function.
-Thanks to @fabian.bader.cloud for pointing out RunLiveResponseApi is now included in the UAL
+Thanks to 🦋[@fabian.bader.cloud](https://bsky.app/profile/fabian.bader.cloud) for pointing out RunLiveResponseApi is now included in the UAL
 
 The results include the Device name, binaries run, and the corresponding Live Response API command string
 
