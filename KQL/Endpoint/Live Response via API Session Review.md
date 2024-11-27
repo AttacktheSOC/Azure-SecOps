@@ -10,7 +10,8 @@
 | T1059.009 | Command and Scripting Interpreter: Cloud API | https://attack.mitre.org/techniques/T1059/009/ |
 
 #### Description
-*this query still needs work and testing* - Dylan 11-27-2024
+*this query still needs work and testing* - *Dylan 11-27-2024*
+
 Correlates commands run during a Live Response session initiated via API on individual endpoints using the row_window_session function.
 Thanks to @fabian.bader.cloud for pointing out RunLiveResponseApi is now included in the UAL
 
