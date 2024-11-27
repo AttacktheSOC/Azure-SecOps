@@ -26,7 +26,7 @@ let PIDs = DeviceProcessEvents
 PIDs
 | join DeviceProcessEvents on $right.InitiatingProcessId == $left.ProcessId , $right.DeviceId == $left.DeviceId
 | where FileName !in ("csc.exe", "conhost.exe") // noisy processes
-| where InitiatingProcessFileName == "powershell.exe" and InitiatingProcessFileName == "powershell.exe"
+| where InitiatingProcessFileName == "powershell.exe"
 | where ProcessCommandLine !contains "ew0KICAgICJTY2FubmVyQXJncyI" // Disovery scan configs
 | where InitiatingProcessCommandLine !contains "eyJEZXRlY3Rpb25LZXlzIjp" // MDE deception lure configs
 | sort by DeviceId, TimeGenerated asc
