@@ -4,7 +4,7 @@
 $DestinationTenantId = "<TenantID>" # Azure Tenant ID, can be found at https://portal.azure.com/#view/Microsoft_AAD_IAM/ActiveDirectoryMenuBlade/~/Overview
 $ManagedIdentityName = "<Name of MId>" # Name of system-assigned or user-assigned managed service identity. (System-assigned use same name as resource).
 $ManagementRoleName = "<ExO Management Role name>" # Name for the new ExO Manage Role with restricted permissions
-$ParentExOManagementRole = "<ExO Parent Role name>" # Name for the parent ExO manaement role. To view List of possible roles run: Get-ManagementRole * | Select-Object Name, RoleEntries
+$ParentExOManagementRole = "<Ex. Distribution Groups>" # Name for the parent ExO manaement role. To view List of possible roles run: Get-ManagementRole * | Select-Object Name, RoleEntries
 
 # Graph permissions to assign to the Managed Identity 
 $AssignMgPermissions = @(
@@ -78,7 +78,7 @@ New-MgServicePrincipalAppRoleAssignment -ServicePrincipalId $MIdSPN.Id -Principa
 New-ServicePrincipal -AppId $MIdSPN.AppId -ServiceId $MIdSPN.Id -DisplayName $ManagedIdentityName
 
 # Create a new management role and restrict permissions of Service Principal to only those required to perform task
-New-ManagementRole -Name "$ManagementRoleName" -Parent "Distribution Groups"
+New-ManagementRole -Name "$ManagementRoleName" -Parent $ParentExOManagementRole
 
 # Get a list possible permissions by running: Get-ManagementRoleEntry "${ManagementRoleName}\*" | fl*
 Get-ManagementRoleEntry "${ManagementRoleName}\*" | Where-Object { $_.Name -notin $ExORolePermissions } | ForEach-Object { Remove-ManagementRoleEntry -Identity "${ManagementRoleName}\$($_.Name)" -Verbose -Confirm:$false }
