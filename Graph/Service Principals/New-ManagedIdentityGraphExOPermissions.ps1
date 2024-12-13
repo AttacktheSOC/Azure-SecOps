@@ -1,5 +1,12 @@
-# This script allows you to grant a Managed Identity access to Graph and Exchange Online Powershell.
-#
+<# 
+This script allows you to grant a Managed Identity access to Graph and Exchange Online Powershell.
+1. Grants MS Graph permission
+2. Grants ExchangeManageAsApp permission
+3. Creates a linked ExO service principal
+4. creates a new Management role with option to have least privilege
+5. Assigns the new ExO management role to the linked SPN
+You could also create a new ExO Management scope to further lock down the SPN to a particular object(s)
+#>
 ## Requires -Modules Microsoft.Graph.Applications, ExchangeOnlineManagement
 $DestinationTenantId = "<TenantID>" # Azure Tenant ID, can be found at https://portal.azure.com/#view/Microsoft_AAD_IAM/ActiveDirectoryMenuBlade/~/Overview
 $ManagedIdentityName = "<Name of MId>" # Name of system-assigned or user-assigned managed service identity. (System-assigned use same name as resource).
