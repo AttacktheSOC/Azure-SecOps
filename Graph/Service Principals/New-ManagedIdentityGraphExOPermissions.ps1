@@ -43,7 +43,7 @@ Connect-MgGraph -TenantId $DestinationTenantId -Scopes $MgRequiredScopes #-NoWel
 Connect-ExchangeOnline
 
 #########################################################################################
-#
+# Found here: https://stackoverflow.com/questions/72904838/how-to-set-microsoft-graph-api-permissions-on-azure-managed-service-identity-wit
 # Perform actions to grant Managed Identity access to Microsoft Graph
 
 # Get the SP objects
@@ -69,7 +69,7 @@ foreach($AppPermission in $AppPermIds)
 }
 
 #########################################################################################
-#
+# Found here: https://blog.nathanmcnulty.com/azure-automation-advanced-auditing/
 # The code below performs actions to grant your Managed Identity access to ExO Powershell
 
 # Get the SPId for Exchange Online
