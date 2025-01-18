@@ -3,7 +3,7 @@
 ## Query Information
 
 #### Description
-Identify (API/SCIM) user provisioning failures realted to enterprise applications provisioning and pull the error information.
+Identify (API/SCIM) user provisioning failures related to enterprise applications provisioning and pull the error information.
 
 ## Defender XDR
 ```KQL
