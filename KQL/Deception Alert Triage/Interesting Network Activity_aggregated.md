@@ -21,7 +21,7 @@ let entities = AlertEvidence
 | summarize DeviceId = any(DeviceId) by TimeGenerated, AlertId;
 entities
 | join DeviceNetworkEvents on $left.DeviceId == $right.DeviceId
-| where TimeGenerated1 between (todatetime(TimeGenerated - todatetime(1h)) .. todatetime(TimeGenerated + todatetime(1h)))
+| where TimeGenerated1 between ((TimeGenerated - totimespan(1h)) .. (TimeGenerated + totimespan(1h)))
 | where ActionType endswith "AggregatedReport"
 | extend uniqueEventsAggregated = toint(extractjson("$.uniqueEventsAggregated", ["AdditionalFields"]))
 | summarize Total = sum(uniqueEventsAggregated) by RemoteIP, ActionType
