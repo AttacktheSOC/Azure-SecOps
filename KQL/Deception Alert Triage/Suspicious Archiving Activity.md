@@ -13,7 +13,7 @@ Disclaimer: This query currently only detects 7Zip and built-in Tar usage, will 
 ```KQL// Deception triage: Exfil
 // Identify archiving activity within a 2 hour timespan of a Deception detection
 // more to come, this currently only detects 7Zip and built-in Tar usage.
-let alertID = "da66cc5c32-74ff-4e44-a666-2c78ea98a892_1";
+let alertID = ""; // change me
 let entities = AlertEvidence
 | where AlertId == alertID
 | where EntityType in ("Process")
