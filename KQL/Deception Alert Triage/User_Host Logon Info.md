@@ -21,7 +21,7 @@ let entities = AlertEvidence
 | summarize DeviceId = any(DeviceId), AccountName = any(AccountName) by TimeGenerated, AlertId;
 entities
 | join DeviceLogonEvents on $left.DeviceId == $right.DeviceId and $left.AccountName == $right.AccountName
-| where TimeGenerated1 between (todatetime(TimeGenerated - todatetime(1h)) .. todatetime(TimeGenerated + todatetime(1h)))
+| where TimeGenerated1 between ((TimeGenerated - totimespan(1h)) .. (TimeGenerated + totimespan(1h)))
 | project-away TimeGenerated, DeviceId1, Timestamp
 | project-rename TimeGenerated = TimeGenerated1
 | sort by TimeGenerated
