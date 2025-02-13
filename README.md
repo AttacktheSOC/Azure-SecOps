@@ -21,6 +21,7 @@ This repository is a collection of **Kusto Query Language (KQL) queries, reusabl
    ```powershell
    Install-Module Microsoft.Graph -Scope CurrentUser
    ```
+3. Authenticate and execute scripts to automate security monitoring, identity management, and other tasks.
 
 ## 🔄 Contributions & Feedback  
 
