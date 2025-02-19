@@ -6,13 +6,11 @@ param(
     [string]$csvFilePath
 )
 
-# Check if the file exists
 if (-Not (Test-Path $csvFilePath)) {
     Write-Host "Error: File not found at $csvFilePath"
     exit 1
 }
 
-# Output file appends _processed.csv
 $outputFilePath = [System.IO.Path]::Combine(
     [System.IO.Path]::GetDirectoryName($csvFilePath),
     "$( [System.IO.Path]::GetFileNameWithoutExtension($csvFilePath))_processed.csv"
@@ -27,14 +25,23 @@ foreach ($user in $users) {
     $objectId = "Not Found"
     
     if ($email -and $email -ne "") {
-        try {
-            $graphUser = Get-MgUser -Filter "mail eq '$email'"
+        $graphUser = Get-MgUser -Filter "mail eq '$email'" -ErrorAction SilentlyContinue
+        
+        if ($graphUser) {
+            $objectId = $graphUser.Id
+            Write-Host "Found User: $email -> Object ID: $objectId"
+        } else {
+            Write-Host "User not found by email: $email"
+            
+            # if item is not found via email, check if email is a UPN
+            $graphUser = Get-MgUser -Filter "userPrincipalName eq '$email'" -ErrorAction SilentlyContinue
+            
             if ($graphUser) {
                 $objectId = $graphUser.Id
-                Write-Host "Found User: $email -> Object ID: $objectId"
+                Write-Host "Found UPN: $email -> Object ID: $objectId"
+            } else {
+                Write-Host "User not found by UPN: $email"
             }
-        } catch {
-            Write-Host "Error finding user: $email"
         }
     }
     
@@ -46,4 +53,4 @@ foreach ($user in $users) {
 
 $processedUsers | Export-Csv -Path $outputFilePath -NoTypeInformation
 
-Write-Host "Processed CSV saved to $outputFilePath"
+Write-Host "Finished writing results to $outputFilePath ..."
