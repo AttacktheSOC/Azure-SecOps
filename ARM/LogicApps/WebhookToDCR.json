@@ -1,0 +1,96 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workflowName": {
+      "type": "string",
+      "defaultValue": "SSPM-Webhook-Forwarder",
+      "metadata": {
+        "description": "Name of the Logic App Workflow"
+      }
+    },
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "Location for the Logic App Workflow"
+      }
+    },
+    "dcrIngestUrl": {
+      "type": "string",
+      "defaultValue": "https://log-ingest-uri/dataCollectionRules/dcr-xxxx/streams/Custom-YourStream_CL?api-version=2023-01-01",
+      "metadata": {
+        "description": "URL for the Data Collection Rule (DCR) stream to forward data to; You can fix it later"
+      }
+    }
+  },
+  "variables": {},
+  "resources": [
+    {
+      "type": "Microsoft.Logic/workflows",
+      "apiVersion": "2017-07-01",
+      "name": "[parameters('workflowName')]",
+      "location": "[parameters('location')]",
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "properties": {
+        "state": "Enabled",
+        "definition": {
+          "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+          "contentVersion": "1.0.0.0",
+          "parameters": {
+            "$connections": {
+              "defaultValue": {},
+              "type": "Object"
+            }
+          },
+          "triggers": {
+            "When_a_HTTP_request_is_received": {
+              "type": "Request",
+              "kind": "Http",
+              "inputs": {
+                "method": "POST",
+                "schema": {
+                  "type": "object",
+                  "properties": {}
+                }
+              }
+            }
+          },
+          "actions": {
+            "HTTP_Post_to_DCR": {
+              "runAfter": {},
+              "type": "Http",
+              "inputs": {
+                "uri": "[parameters('dcrIngestUrl')]",
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": "[
+                @triggerBody()
+                ]",
+                "authentication": {
+                  "type": "ManagedServiceIdentity",
+                  "audience": "https://monitor.azure.com"
+                }
+              },
+              "runtimeConfiguration": {
+                "contentTransfer": {
+                  "transferMode": "Chunked"
+                }
+              }
+            }
+          },
+          "outputs": {}
+        },
+        "parameters": {
+          "$connections": {
+            "value": {}
+          }
+        }
+      }
+    }
+  ]
+}
