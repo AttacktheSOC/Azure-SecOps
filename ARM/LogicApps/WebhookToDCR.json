@@ -68,9 +68,7 @@
                 "headers": {
                   "Content-Type": "application/json"
                 },
-                "body": "[
-                @triggerBody()
-                ]",
+                "body": "[@triggerBody()]",
                 "authentication": {
                   "type": "ManagedServiceIdentity",
                   "audience": "https://monitor.azure.com"
