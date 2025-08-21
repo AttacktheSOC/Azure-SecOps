@@ -29,9 +29,6 @@ try {
 $headers = @{
     "Authorization" = "Bearer $token"
     "Content-Type" = "application/json"
-    "Accept" = "application/json"
-    "Origin" = "https://security.microsoft.com"
-    "Referer" = "https://security.microsoft.com/"
 }
 
 # ----------------------------
