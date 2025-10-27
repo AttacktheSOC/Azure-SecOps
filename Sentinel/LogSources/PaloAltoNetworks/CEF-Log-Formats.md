@@ -17,7 +17,7 @@ Perform the following steps to configure the Palo Alto Networks firewall for CEF
 
 3. 	Enter a server profile **Name** and **Location** (location refers to a virtual system, if the device is enabled for virtual systems).
 
-4. 	In the **Servers** tab, click **Add** and enter a **Name**, IP address (**Syslog Server** field), **Transport**, **Port** (default 514 for UDP), and **Facility** (default LOG_USER) for the Syslog server. 
+4. 	In the **Servers** tab, click **Add** and enter a **Name**, IP address (**Syslog Server** field), **Transport**, **Port** (default 514 for UDP), **Format** set to BSD, and **Facility** (default LOG_USER) for the Syslog server. 
 
 5. 	Select the **Custom Log Format** tab and click any of the listed log types (Config, System, Threat, Traffic, URL, Data, WildFire, Tunnel, Authentication, User-ID, HIP Match) to define a custom format based on the CEF for that log type.
 
@@ -96,4 +96,6 @@ Perform the following steps to configure the Palo Alto Networks firewall for CEF
       ```
       <img width="649" height="558" alt="image" src="https://github.com/user-attachments/assets/4e3f8dd9-bf8c-435b-b51c-633218568c7d" />
 
-7. 	Click OK twice to save your entries, then click Commit
+7. 	The Custom Log Format tab supports escaping any characters defined in the CEF as special characters. For instance, to use a backslash to escape the backslash and equal characters, select the Escaping check box, specify **\=** as the Escaped Characters and **\** as the Escape Character. THis comes in handy for log categories such URL where the URI parameters aren't parsed correctly without escaping '='.
+   
+8. 	Click OK twice to save your entries, then click Commit
