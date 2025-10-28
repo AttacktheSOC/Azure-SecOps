@@ -96,6 +96,7 @@ Perform the following steps to configure the Palo Alto Networks firewall for CEF
       ```
       <img width="649" height="558" alt="image" src="https://github.com/user-attachments/assets/4e3f8dd9-bf8c-435b-b51c-633218568c7d" />
 
-7. 	The Custom Log Format tab supports escaping any characters defined in the CEF as special characters. For instance, to use a backslash to escape the backslash and equal characters, select the Escaping check box, specify **\=** as the Escaped Characters and **\** as the Escape Character. THis comes in handy for log categories such URL where the URI parameters aren't parsed correctly without escaping '='.
+7. 	The Custom Log Format tab supports escaping any characters defined in the CEF as special characters. For instance, to use a backslash to escape the backslash and equal characters, select the Escaping check box, specify '**\\=**' as the Escaped Characters (without the single-quotes) and '**\\**' as the Escape Character (without the single-quotes).
+      This comes in handy for log categories such as URL where the URI parameters aren't parsed correctly without escaping '='.
    
-8. 	Click OK twice to save your entries, then click Commit
+9. 	Click OK twice to save your entries, then click Commit
