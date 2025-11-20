@@ -4,6 +4,9 @@
 
 This solution enables you to ingest Cisco Meraki organization events (Security Events, Configuration Changes, and API Requests) into Microsoft Sentinel using the Cisco Meraki REST API. The connector leverages DCR-based ingestion time transformations for data normalization and parsing, supporting ASIM schemas for Network Session, Web Session, and Audit Event logs.
 
+> [!NOTE]  
+> This connector definition was modified to allow you to deploy the Meraki Codeless Connector multiple times, ideal in environments with multiple organizations!
+
 **Key Features:**
 - Ingests Meraki Security Events, Configuration Changes, and API Requests.
 - Supports DCR-based ingestion-time filtering and normalization.
@@ -14,7 +17,7 @@ This solution enables you to ingest Cisco Meraki organization events (Security E
 
 ## Deploy to Azure
 
-[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com/<YOUR_GITHUB_ORG>/<YOUR_REPO>/main/mainTemplate.json)
+[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FAttacktheSOC%2FAzure-SecOps%2Frefs%2Fheads%2Fmain%2FDataConnectors%2FCiscoMeraki-CodelessConnector%2FmainTemplate.json)
 
 ---
 
