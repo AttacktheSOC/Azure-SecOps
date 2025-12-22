@@ -236,7 +236,8 @@ AsrPsexecWmiChildProcessBlocked
 An attack surface reduction rule blocked the use of PsExec or WMI commands to spawn a child process.
 
 AsrPsexecWmiChildProcessWarnBypassed
-User excluded ASR block for "Block Process Creations originating from PSExec &amp; WMI commands" rule enabled in WARN mode.
+User excluded ASR block for "Block Process Creations originating from PSExec &amp
+ WMI commands" rule enabled in WARN mode.
 
 AsrRansomwareAudited
 An attack surface reduction rule detected ransomware activity.
@@ -408,6 +409,12 @@ Exploit protection detected a call to the Windows system API.
 
 ExploitGuardWin32SystemCallBlocked
 Exploit protection blocked a call to the Windows system API.
+
+ExternalDeviceConnected
+A peripheral connected to this device.
+
+ExternalDeviceDisconnected
+A peripheral disconnected from this device.
 
 FileTimestampModificationEvent
 File timestamp information was modified.
