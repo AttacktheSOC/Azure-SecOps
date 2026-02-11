@@ -1,0 +1,219 @@
+{
+  "version": "Notebook/1.0",
+  "items": [
+    {
+      "type": 1,
+      "content": {
+        "json": "# Sentinel Table Retention – Decouple Total Retention\n\nThis workbook helps you **decouple** `totalRetentionInDaysAsDefault` from workspace defaults for Log Analytics tables.\n\n**Workflow:**\n1. Pick **Subscription** and **Workspace (RG / Workspace)**\n2. Select a table row\n3. Click **Decouple**\n4. Use **Status Validator** (separate) to confirm after a short delay\n\n> Validator can be **eventually consistent**. If it doesn’t update immediately, wait 60–120 seconds and refresh.",
+        "style": "info"
+      },
+      "name": "text - header"
+    },
+    {
+      "type": 9,
+      "content": {
+        "version": "KqlParameterItem/1.0",
+        "parameters": [
+          {
+            "id": "b5a3f1df-3d25-4cbd-8d17-0c3c1de1c001",
+            "version": "KqlParameterItem/1.0",
+            "name": "DefaultSubscription_Internal",
+            "type": 1,
+            "isRequired": true,
+            "query": "where type =~ 'microsoft.operationalinsights/workspaces'\n| take 1\n| project subscriptionId",
+            "crossComponentResources": [
+              "value::selected"
+            ],
+            "isHiddenWhenLocked": true,
+            "queryType": 1,
+            "resourceType": "microsoft.resourcegraph/resources"
+          },
+          {
+            "id": "8fb6404d-693f-4e60-9a2a-7e9aaf2f4c10",
+            "version": "KqlParameterItem/1.0",
+            "name": "Subscription",
+            "type": 6,
+            "query": "summarize by subscriptionId\n| project value = strcat('/subscriptions/', subscriptionId), label = subscriptionId, selected = iff(subscriptionId =~ '{DefaultSubscription_Internal}', true, false)",
+            "crossComponentResources": [
+              "value::selected"
+            ],
+            "typeSettings": {
+              "additionalResourceOptions": [],
+              "showDefault": false
+            },
+            "queryType": 1,
+            "resourceType": "microsoft.resourcegraph/resources",
+            "value": ""
+          },
+          {
+            "id": "1f2c4b5e-85e1-4c8d-9c1a-4f2749b2e7d5",
+            "version": "KqlParameterItem/1.0",
+            "name": "Workspace",
+            "label": "Workspace (RG / Workspace)",
+            "type": 5,
+            "query": "resources\n| where type =~ 'microsoft.operationalinsights/workspaces'\n| extend subId = tostring(subscriptionId)\n| where strcat('/subscriptions/', subId) == '{Subscription}'\n| order by id\n| project value = id, label = strcat(resourceGroup, ' / ', name), selected = row_number() == 1, group = resourceGroup",
+            "crossComponentResources": [
+              "{Subscription}"
+            ],
+            "typeSettings": {
+              "resourceTypeFilter": {
+                "microsoft.operationalinsights/workspaces": true
+              },
+              "additionalResourceOptions": [],
+              "showDefault": false
+            },
+            "queryType": 1,
+            "resourceType": "microsoft.resourcegraph/resources"
+          },
+          {
+            "id": "5b51576f-19b6-4a3b-9c32-88b4c6f2f1ac",
+            "version": "KqlParameterItem/1.0",
+            "name": "resourceGroup",
+            "type": 1,
+            "query": "resources\n| where type =~ 'microsoft.operationalinsights/workspaces'\n| where id == '{Workspace}'\n| project resourceGroup",
+            "isHiddenWhenLocked": true,
+            "queryType": 1,
+            "resourceType": "microsoft.resourcegraph/resources"
+          },
+          {
+            "id": "d7aa2e4d-1f5a-4e6f-91b2-87fef8e8fd0d",
+            "version": "KqlParameterItem/1.0",
+            "name": "WorkspaceName",
+            "type": 1,
+            "query": "resources\n| where type =~ 'microsoft.operationalinsights/workspaces'\n| where id == '{Workspace}'\n| project name",
+            "isHiddenWhenLocked": true,
+            "queryType": 1,
+            "resourceType": "microsoft.resourcegraph/resources"
+          },
+          {
+            "id": "3f9f6d5a-2a1b-4f8a-a7b7-0d0bf3d7f77f",
+            "version": "KqlParameterItem/1.0",
+            "name": "ApiVersion",
+            "label": "OperationalInsights API version",
+            "type": 1,
+            "value": "2025-07-01",
+            "typeSettings": {
+              "placeholder": "2025-07-01"
+            }
+          }
+        ],
+        "style": "above",
+        "queryType": 1,
+        "resourceType": "microsoft.resourcegraph/resources"
+      },
+      "name": "parameters - main"
+    },
+    {
+      "type": 12,
+      "content": {
+        "version": "NotebookGroup/1.0",
+        "groupType": "editable",
+        "items": [
+          {
+            "type": 1,
+            "content": {
+              "json": "## Tables\nSelect a row and click **Decouple**.",
+              "style": "info"
+            },
+            "name": "text - tables"
+          },
+          {
+            "type": 3,
+            "content": {
+              "version": "KqlItem/1.0",
+              "query": "{\"version\":\"ARMEndpoint/1.0\",\"headers\":[],\"method\":\"GET\",\"path\":\"{Subscription}/resourceGroups/{resourceGroup}/providers/Microsoft.OperationalInsights/workspaces/{WorkspaceName}/tables\",\"urlParams\":[{\"key\":\"api-version\",\"value\":\"{ApiVersion}\"}],\"batchDisabled\":false,\"transformers\":[{\"type\":\"jsonpath\",\"settings\":{\"tablePath\":\"$.value\",\"columns\":[{\"path\":\"$.properties.schema.name\",\"columnid\":\"TableName\"},{\"path\":\"$.properties.schema.tableType\",\"columnid\":\"TableType\"},{\"path\":\"$.properties.plan\",\"columnid\":\"Plan\"},{\"path\":\"$.properties.retentionInDays\",\"columnid\":\"AnalyticsRetentionInDays\"},{\"path\":\"$.properties.totalRetentionInDays\",\"columnid\":\"TotalRetentionInDays\"},{\"path\":\"$.properties.archiveRetentionInDays\",\"columnid\":\"ArchiveRetentionInDays\"},{\"path\":\"$.properties.totalRetentionInDaysAsDefault\",\"columnid\":\"TotalRetentionInDaysAsDefault\"}]}}]}",
+              "size": 1,
+              "title": "Workspace Tables (click a row to select)",
+              "exportedParameters": [
+                {
+                  "fieldName": "TableName",
+                  "parameterName": "SelectedTableName"
+                },
+                {
+                  "fieldName": "TotalRetentionInDays",
+                  "parameterName": "SelectedTotalRetentionInDays",
+                  "parameterType": 1
+                }
+              ],
+              "queryType": 12,
+              "gridSettings": {
+                "rowLimit": 1000
+              },
+              "sortBy": []
+            },
+            "name": "query - list tables"
+          },
+          {
+            "type": 11,
+            "content": {
+              "version": "LinkItem/1.0",
+              "style": "list",
+              "links": [
+                {
+                  "id": "f3f5037a-8d7c-4c45-9f07-73d3f06a6f11",
+                  "linkTarget": "ArmAction",
+                  "linkLabel": "Decouple (set TotalRetentionInDaysAsDefault = false)",
+                  "style": "primary",
+                  "linkIsContextBlade": true,
+                  "armActionContext": {
+                    "path": "{Subscription}/resourceGroups/{resourceGroup}/providers/Microsoft.OperationalInsights/workspaces/{WorkspaceName}/tables/{SelectedTableName}?api-version={ApiVersion}",
+                    "headers": [],
+                    "params": [],
+                    "body": "{\n  \"properties\": {\n    \"totalRetentionInDaysAsDefault\": false,\n    \"totalRetentionInDays\": {SelectedTotalRetentionInDays}\n  }\n}",
+                    "httpMethod": "PUT",
+                    "title": "Decouple Total Retention for {SelectedTableName}",
+                    "description": "## Decouple Total Retention for {SelectedTableName}\n\nThis action sets `totalRetentionInDaysAsDefault = false` for {SelectedTableName}.\n\n- **Preserves** the current `totalRetentionInDays` by writing back the existing value.\n- Does **not** change analytics or archive retention.\n\n> If validation doesn’t update immediately, wait 60–120 seconds and refresh the validator.",
+                    "runLabel": "Decouple {SelectedTableName}"
+                  }
+                }
+              ]
+            },
+            "name": "links - decouple"
+          }
+        ],
+        "exportParameters": true
+      },
+      "name": "group - tables"
+    },
+    {
+      "type": 12,
+      "content": {
+        "version": "NotebookGroup/1.0",
+        "groupType": "editable",
+        "items": [
+          {
+            "type": 1,
+            "content": {
+              "json": "## Status Validator (separate)\nThis section is intentionally separate because the API/portal can take time to reflect changes.\n\n**How to use:** select a table ➜ click **Decouple** ➜ wait 60–120 seconds ➜ refresh this validator.",
+              "style": "info"
+            },
+            "name": "text - validator"
+          },
+          {
+            "type": 3,
+            "content": {
+              "version": "KqlItem/1.0",
+              "query": "{\"version\":\"ARMEndpoint/1.0\",\"headers\":[],\"method\":\"GET\",\"path\":\"{Subscription}/resourceGroups/{resourceGroup}/providers/Microsoft.OperationalInsights/workspaces/{WorkspaceName}/tables/{SelectedTableName}\",\"urlParams\":[{\"key\":\"api-version\",\"value\":\"{ApiVersion}\"}],\"batchDisabled\":false,\"transformers\":[{\"type\":\"jsonpath\",\"settings\":{\"tablePath\":\"$.properties\",\"columns\":[{\"path\":\"$.schema.name\",\"columnid\":\"TableName\"},{\"path\":\"$.totalRetentionInDaysAsDefault\",\"columnid\":\"TotalRetentionInDaysAsDefault\"},{\"path\":\"$.totalRetentionInDays\",\"columnid\":\"TotalRetentionInDays\"},{\"path\":\"$.retentionInDays\",\"columnid\":\"AnalyticsRetentionInDays\"},{\"path\":\"$.archiveRetentionInDays\",\"columnid\":\"ArchiveRetentionInDays\"}]}}]}",
+              "size": 1,
+              "title": "Validator – current values for selected table",
+              "showRefreshButton": true,
+              "queryType": 12,
+              "sortBy": []
+            },
+            "conditionalVisibility": {
+              "parameterName": "SelectedTableName",
+              "comparison": "isNotEqualTo"
+            },
+            "name": "query - validator"
+          }
+        ]
+      },
+      "name": "group - validator"
+    }
+  ],
+  "fallbackResourceIds": [
+    ""
+  ],
+  "fromTemplateId": "sentinel-UserWorkbook",
+  "$schema": "https://github.com/Microsoft/Application-Insights-Workbooks/blob/master/schema/workbook.json"
+}
