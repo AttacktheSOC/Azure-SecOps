@@ -4,7 +4,7 @@
     {
       "type": 1,
       "content": {
-        "json": "# Sentinel Table Retention – Decouple Total Retention\n\nThis workbook helps you **decouple** `totalRetentionInDaysAsDefault` from workspace defaults for Log Analytics tables.\n\n**Workflow:**\n1. Pick **Subscription** and **Workspace (RG / Workspace)**\n2. Select a table row\n3. Click **Decouple**\n4. Use **Status Validator** (separate) to confirm after a short delay\n\n> Validator can be **eventually consistent**. If it doesn’t update immediately, wait 60–120 seconds and refresh.",
+        "json": "# Sentinel Table Retention – Decouple Total Retention\n\nThis workbook helps you **decouple** `totalRetentionInDaysAsDefault` from workspace defaults for Log Analytics tables.\n\n**Workflow:**\n1. Pick **Subscription** and **Workspace (RG / Workspace)**\n2. Allow tables and their values to sync in\n3. Click on the **TableName** of the tables you'd like to decouple from the default retention settings\n4. Refresh the table after a few moments to see the TotalRetentionInDaysAsDefault column status change\n\n> Validator can be **eventually consistent**. If it doesn’t update immediately, wait 60–120 seconds and refresh.",
         "style": "info"
       },
       "name": "text - header"
@@ -98,8 +98,8 @@
           }
         ],
         "style": "above",
-        "queryType": 1,
-        "resourceType": "microsoft.resourcegraph/resources"
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces"
       },
       "name": "parameters - main"
     },
@@ -112,7 +112,7 @@
           {
             "type": 1,
             "content": {
-              "json": "## Tables\nSelect a row and click **Decouple**.",
+              "json": "## Tables\nSelect a table to **Decouple**.",
               "style": "info"
             },
             "name": "text - tables"
@@ -121,7 +121,7 @@
             "type": 3,
             "content": {
               "version": "KqlItem/1.0",
-              "query": "{\"version\":\"ARMEndpoint/1.0\",\"headers\":[],\"method\":\"GET\",\"path\":\"{Subscription}/resourceGroups/{resourceGroup}/providers/Microsoft.OperationalInsights/workspaces/{WorkspaceName}/tables\",\"urlParams\":[{\"key\":\"api-version\",\"value\":\"{ApiVersion}\"}],\"batchDisabled\":false,\"transformers\":[{\"type\":\"jsonpath\",\"settings\":{\"tablePath\":\"$.value\",\"columns\":[{\"path\":\"$.properties.schema.name\",\"columnid\":\"TableName\"},{\"path\":\"$.properties.schema.tableType\",\"columnid\":\"TableType\"},{\"path\":\"$.properties.plan\",\"columnid\":\"Plan\"},{\"path\":\"$.properties.retentionInDays\",\"columnid\":\"AnalyticsRetentionInDays\"},{\"path\":\"$.properties.totalRetentionInDays\",\"columnid\":\"TotalRetentionInDays\"},{\"path\":\"$.properties.archiveRetentionInDays\",\"columnid\":\"ArchiveRetentionInDays\"},{\"path\":\"$.properties.totalRetentionInDaysAsDefault\",\"columnid\":\"TotalRetentionInDaysAsDefault\"}]}}]}",
+              "query": "{\"version\":\"ARMEndpoint/1.0\",\"headers\":[],\"method\":\"GET\",\"path\":\"{Subscription}/resourceGroups/{resourceGroup}/providers/Microsoft.OperationalInsights/workspaces/{WorkspaceName}/tables\",\"urlParams\":[{\"key\":\"api-version\",\"value\":\"{ApiVersion}\"}],\"batchDisabled\":true,\"transformers\":[{\"type\":\"jsonpath\",\"settings\":{\"tablePath\":\"$.value\",\"columns\":[{\"path\":\"$.properties.schema.name\",\"columnid\":\"TableName\"},{\"path\":\"$.properties.schema.tableType\",\"columnid\":\"TableType\"},{\"path\":\"$.properties.plan\",\"columnid\":\"Plan\"},{\"path\":\"$.properties.retentionInDays\",\"columnid\":\"AnalyticsRetentionInDays\"},{\"path\":\"$.properties.totalRetentionInDays\",\"columnid\":\"TotalRetentionInDays\"},{\"path\":\"$.properties.archiveRetentionInDays\",\"columnid\":\"ArchiveRetentionInDays\"},{\"path\":\"$.properties.totalRetentionInDaysAsDefault\",\"columnid\":\"TotalRetentionInDaysAsDefault\"}]}}]}",
               "size": 1,
               "title": "Workspace Tables (click a row to select)",
               "exportedParameters": [
@@ -137,78 +137,40 @@
               ],
               "queryType": 12,
               "gridSettings": {
+                "formatters": [
+                  {
+                    "columnMatch": "TableName",
+                    "formatter": 7,
+                    "formatOptions": {
+                      "linkTarget": "ArmAction",
+                      "linkIsContextBlade": true,
+                      "armActionContext": {
+                        "path": "{Subscription}/resourceGroups/{resourceGroup}/providers/Microsoft.OperationalInsights/workspaces/{WorkspaceName}/tables/[\"TableName\"]",
+                        "headers": [],
+                        "params": [
+                          {
+                            "key": "api-version",
+                            "value": "{ApiVersion}"
+                          }
+                        ],
+                        "body": "{\r\n  \"properties\": {\r\n    \"totalRetentionInDaysAsDefault\": false,\r\n    \"totalRetentionInDays\": [\"TotalRetentionInDays\"]\r\n  }\r\n}",
+                        "httpMethod": "PUT",
+                        "title": "Decouple Total Retention for {SelectedTableName}",
+                        "description": "## Decouple Total Retention for {SelectedTableName}\n\nThis action sets `totalRetentionInDaysAsDefault = false` for {SelectedTableName}.\n\n- **Preserves** the current `totalRetentionInDays` by writing back the existing value.\n- Does **not** change analytics or archive retention.\n\n> If validation doesn’t update immediately, wait 60–120 seconds and refresh the validator."
+                      }
+                    }
+                  }
+                ],
                 "rowLimit": 1000
               },
               "sortBy": []
             },
             "name": "query - list tables"
-          },
-          {
-            "type": 11,
-            "content": {
-              "version": "LinkItem/1.0",
-              "style": "list",
-              "links": [
-                {
-                  "id": "f3f5037a-8d7c-4c45-9f07-73d3f06a6f11",
-                  "linkTarget": "ArmAction",
-                  "linkLabel": "Decouple (set TotalRetentionInDaysAsDefault = false)",
-                  "style": "primary",
-                  "linkIsContextBlade": true,
-                  "armActionContext": {
-                    "path": "{Subscription}/resourceGroups/{resourceGroup}/providers/Microsoft.OperationalInsights/workspaces/{WorkspaceName}/tables/{SelectedTableName}?api-version={ApiVersion}",
-                    "headers": [],
-                    "params": [],
-                    "body": "{\n  \"properties\": {\n    \"totalRetentionInDaysAsDefault\": false,\n    \"totalRetentionInDays\": {SelectedTotalRetentionInDays}\n  }\n}",
-                    "httpMethod": "PUT",
-                    "title": "Decouple Total Retention for {SelectedTableName}",
-                    "description": "## Decouple Total Retention for {SelectedTableName}\n\nThis action sets `totalRetentionInDaysAsDefault = false` for {SelectedTableName}.\n\n- **Preserves** the current `totalRetentionInDays` by writing back the existing value.\n- Does **not** change analytics or archive retention.\n\n> If validation doesn’t update immediately, wait 60–120 seconds and refresh the validator.",
-                    "runLabel": "Decouple {SelectedTableName}"
-                  }
-                }
-              ]
-            },
-            "name": "links - decouple"
           }
         ],
         "exportParameters": true
       },
       "name": "group - tables"
-    },
-    {
-      "type": 12,
-      "content": {
-        "version": "NotebookGroup/1.0",
-        "groupType": "editable",
-        "items": [
-          {
-            "type": 1,
-            "content": {
-              "json": "## Status Validator (separate)\nThis section is intentionally separate because the API/portal can take time to reflect changes.\n\n**How to use:** select a table ➜ click **Decouple** ➜ wait 60–120 seconds ➜ refresh this validator.",
-              "style": "info"
-            },
-            "name": "text - validator"
-          },
-          {
-            "type": 3,
-            "content": {
-              "version": "KqlItem/1.0",
-              "query": "{\"version\":\"ARMEndpoint/1.0\",\"headers\":[],\"method\":\"GET\",\"path\":\"{Subscription}/resourceGroups/{resourceGroup}/providers/Microsoft.OperationalInsights/workspaces/{WorkspaceName}/tables/{SelectedTableName}\",\"urlParams\":[{\"key\":\"api-version\",\"value\":\"{ApiVersion}\"}],\"batchDisabled\":false,\"transformers\":[{\"type\":\"jsonpath\",\"settings\":{\"tablePath\":\"$.properties\",\"columns\":[{\"path\":\"$.schema.name\",\"columnid\":\"TableName\"},{\"path\":\"$.totalRetentionInDaysAsDefault\",\"columnid\":\"TotalRetentionInDaysAsDefault\"},{\"path\":\"$.totalRetentionInDays\",\"columnid\":\"TotalRetentionInDays\"},{\"path\":\"$.retentionInDays\",\"columnid\":\"AnalyticsRetentionInDays\"},{\"path\":\"$.archiveRetentionInDays\",\"columnid\":\"ArchiveRetentionInDays\"}]}}]}",
-              "size": 1,
-              "title": "Validator – current values for selected table",
-              "showRefreshButton": true,
-              "queryType": 12,
-              "sortBy": []
-            },
-            "conditionalVisibility": {
-              "parameterName": "SelectedTableName",
-              "comparison": "isNotEqualTo"
-            },
-            "name": "query - validator"
-          }
-        ]
-      },
-      "name": "group - validator"
     }
   ],
   "fallbackResourceIds": [
