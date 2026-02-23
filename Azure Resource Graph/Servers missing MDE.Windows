@@ -1,0 +1,10 @@
+Resources
+| where type == 'microsoft.compute/virtualmachines' or type =~ "microsoft.hybridcompute/machines"
+| extend JoinID = toupper(id)
+| join kind=leftouter(
+    Resources
+    | where type == 'microsoft.compute/virtualmachines/extensions' or type =~ "microsoft.hybridcompute/machines/extensions"
+    | extend VMId = toupper(substring(id, 0, indexof(id, '/extensions'))), ExtensionName = name
+) on $left.JoinID == $right.VMId
+| summarize Extensions = make_list(ExtensionName) by VMName = name, resourceGroup, location
+| where not(Extensions contains "MDE")
