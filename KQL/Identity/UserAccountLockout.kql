@@ -1,0 +1,23 @@
+let serverLockouts = materialize(SecurityEvent
+| where EventID == 4740
+| summarize StartTime=min(TimeGenerated), EndTime=max(TimeGenerated), Lockouts=count() by Activity, UserPrincipalName, TargetUserName, TargetSid, TargetDomainName, SourceComputerId, SourceDomainController = Computer
+| project EndTime, AccountName=TargetUserName, Source=TargetDomainName, Type="Server Logs" );
+let onPremLockouts = materialize(IdentityLogonEvents
+| where FailureReason startswith "AccountLocked"
+| extend serversplit = split(DeviceName, ".")
+| extend Server = tostring(parse_json(serversplit)[0])
+| summarize EndTime=max(TimeGenerated) by AccountName, Source=Server
+| extend Type="OnPrem");
+SigninLogs
+| where ResultType == 50053
+| extend UPNSplit = split(AlternateSignInName, '@')
+| extend AccountName = tostring(parse_json(UPNSplit)[0])
+| summarize EndTime=max(TimeGenerated) by AccountName, Source=IPAddress
+| extend Type="Entra SignIns"
+| union serverLockouts, onPremLockouts
+| summarize ['Last Lockout']=max(EndTime) by AccountName, Source, Type
+| join kind=leftouter (IdentityInfo | distinct AccountDisplayName, AccountName, AccountUpn ) on AccountName
+| project-away AccountName1
+| order by AccountName, ['Last Lockout']
+| extend eventID = row_window_session(['Last Lockout'], 2m, 2m, AccountName != prev(AccountName) and Source != prev(Source))
+| summarize by AccountName, Source=tolower(Source), LastLockout=eventID, AccountDisplayName, AccountUpn
