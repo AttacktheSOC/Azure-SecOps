@@ -1,0 +1,79 @@
+let TableName = "SecurityEvent";
+// --- Tunables ---
+let MinDeltaGB_24h = 5.0;          // absolute increase over baseline (GB) required to alert
+let SpikePct_24h   = 50.0;         // percent increase over baseline required to alert
+let SpikeMultiplier_24h = 1.8;     // optional: current 24h must be > baseline * multiplier
+// --- Helpers ---
+let MB_to_GB = (mb:real) { mb / 1000.0 }; // decimal GB
+let SafeReal = (x:real) { iif(isnull(x) or isnan(x), 0.0, x) };
+// --- Window alignment: "current day" = last 24 hours ---
+let Anchor = ago(24h);             // bucket boundary for the current 24h window
+let NowTime = now();
+// Pull enough history to compute up to 30 prior 24h windows (+ current)
+let Windows =
+    Usage
+    | where DataType =~ TableName
+    //| where IsBillable == true // billable ingestion only
+    | where StartTime between (ago(31d) .. NowTime)
+    // Create rolling 24h windows aligned to Anchor
+    | extend WindowStart = bin_at(StartTime, 1d, Anchor)
+    | summarize WindowMB = sum(Quantity) by WindowStart;
+// Current rolling 24h window: [now-24h .. now]
+let Current =
+    Windows
+    | where WindowStart between (Anchor .. NowTime)
+    | summarize Current24hMB = SafeReal(sum(WindowMB))
+    | extend joinKey = 1;
+// Baseline function: average of previous N rolling 24h windows (excluding current)
+let Baseline24h = (days:int) {
+    Windows
+    | where WindowStart between (ago(totimespan(days * 1d)) .. ago(1d))
+    | summarize
+        AvgMB  = SafeReal(avg(WindowMB)),
+        P95MB  = SafeReal(percentile(WindowMB, 95)),
+        StdevMB = SafeReal(stdev(WindowMB))
+    | extend joinKey = 1
+};
+// Build baselines
+let B7  = Baseline24h(7)  | project Avg7MB=AvgMB,  P95_7MB=P95MB  | extend joinKey=1;
+let B14 = Baseline24h(14) | project Avg14MB=AvgMB, P95_14MB=P95MB | extend joinKey=1;
+let B30 = Baseline24h(30) | project Avg30MB=AvgMB, P95_30MB=P95MB | extend joinKey=1;
+// Join and compute deltas/percentages
+Current
+| join kind=inner B7  on joinKey
+| join kind=inner B14 on joinKey
+| join kind=inner B30 on joinKey
+| extend
+    Current24hGB = MB_to_GB(Current24hMB),
+    Avg7_24hGB  = MB_to_GB(Avg7MB),
+    Avg14_24hGB = MB_to_GB(Avg14MB),
+    Avg30_24hGB = MB_to_GB(Avg30MB)
+| extend
+    Delta7_24hGB  = Current24hGB - Avg7_24hGB,
+    Delta14_24hGB = Current24hGB - Avg14_24hGB,
+    Delta30_24hGB = Current24hGB - Avg30_24hGB
+| extend
+    Pct7_24h  = iif(Avg7_24hGB  <= 0.0, real(null), 100.0 * (Current24hGB - Avg7_24hGB)  / Avg7_24hGB),
+    Pct14_24h = iif(Avg14_24hGB <= 0.0, real(null), 100.0 * (Current24hGB - Avg14_24hGB) / Avg14_24hGB),
+    Pct30_24h = iif(Avg30_24hGB <= 0.0, real(null), 100.0 * (Current24hGB - Avg30_24hGB) / Avg30_24hGB)
+| extend
+    AlarmReason = case(
+        // Primary detection: 24h increase vs 7-day baseline
+        (Avg7_24hGB > 0.0 and Delta7_24hGB >= MinDeltaGB_24h and Pct7_24h >= SpikePct_24h),
+            "Last-24h spike vs 7d rolling-24h baseline",
+        // Optional multiplier-based detection (useful when baselines are large)
+        (Avg7_24hGB > 0.0 and Current24hGB >= Avg7_24hGB * SpikeMultiplier_24h and Delta7_24hGB >= MinDeltaGB_24h),
+            "Last-24h spike (multiplier) vs 7d rolling-24h baseline",
+        "NoAlert"
+    )
+//| where AlarmReason != "NoAlert"
+| project
+    TimeGenerated = now(),
+    TableName,
+    WindowStart = Anchor,
+    WindowEnd = NowTime,
+    AlarmReason,
+    Current24hGB,
+    Avg7_24hGB, Avg14_24hGB, Avg30_24hGB,
+    Delta7_24hGB, Delta14_24hGB, Delta30_24hGB,
+    Pct7_24h, Pct14_24h, Pct30_24h
