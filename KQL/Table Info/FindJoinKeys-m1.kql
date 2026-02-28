@@ -1,0 +1,23 @@
+// Use this query to identify join points from table 1 to table(n)
+// Method 1 to find join keys/join points between tables. This method requires no prior knowledge of table schema or value types
+//
+let TargetValues = materialize(
+    SigninLogs // this is the source table (table1)
+    | where TimeGenerated > ago(1d)
+    | where isnotempty(UserPrincipalName) // set this to the column containing the value you're attempting to pivot on/identify join keys to other tables
+    | distinct SearchTerm = tolower(UserPrincipalName) // ensure this matches the column name you entered in the line above
+);
+// search a single table or union (n) tables
+union EntraIdSignInEvents, DeviceLogonEvents, AADNonInteractiveUserSignInLogs, AuditLogs
+| extend RowPacked = pack_all()
+| mv-expand kind=array RowPacked
+| extend 
+    ColumnName  = tostring(RowPacked[0]),    // key is always index 0
+    ColumnValue = tolower(tostring(RowPacked[1]))  // value is always index 1
+| where isnotempty(ColumnValue)
+| join kind=inner (TargetValues) on $left.ColumnValue == $right.SearchTerm
+| summarize 
+    MatchCount   = count(),
+    SampleValues = make_set(ColumnValue, 5)
+  by ColumnName, Type
+| order by MatchCount desc
