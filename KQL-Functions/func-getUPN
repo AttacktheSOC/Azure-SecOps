@@ -1,0 +1,4 @@
+let getUserUPN = (inputString:string) {
+    IdentityInfo | where AccountObjectId =~ inputString | project AccountUpn
+};
+getUserUPN(inputString)
