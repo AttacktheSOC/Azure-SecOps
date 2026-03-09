@@ -12,9 +12,7 @@ Generates a per-machine report of Microsoft Defender for Servers pricing (P1 / P
   - DefenderForServersPricing_Report.csv (default)
   - DefenderForServersPricing_Report.html (default; interactive if enabled)
 
-API used (examples):
-- Get pricing by plan name:
-  - GET https://management.azure.com/{scopeId}/providers/Microsoft.Security/pricings/{pricingName}?api-version=2024-01-01
+API used (example):
 - List pricing configurations at scope:
   - GET https://management.azure.com/{scopeId}/providers/Microsoft.Security/pricings?api-version=2024-01-01
 
