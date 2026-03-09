@@ -553,14 +553,18 @@ for ($i = 0; $i -lt $compute.Count; $i++) {
 
 Write-Progress -Activity "Querying Defender pricing per resource" -Completed
 
+$reportDedup = $report | Group-Object ResourceId | ForEach-Object {
+    $_.Group | Select-Object -First 1
+}
+
 Write-Host "Exporting CSV to: $OutCsv"
-$report | Sort-Object SubscriptionId, ResourceType, ResourceName |
+$reportDedup | Sort-Object SubscriptionId, ResourceType, ResourceName |
     Export-Csv -Path $OutCsv -NoTypeInformation -Encoding UTF8
 
 Write-Host "Exporting HTML to: $OutHtml"
-Export-DefenderServersPricingHtml -Report $report -OutHtml $OutHtml
+Export-DefenderServersPricingHtml -Report $reportDedup -OutHtml $OutHtml
 Write-Host "Done. HTML exported: $OutHtml"
 
-Write-Host "Done. Rows exported: $($report.Count)"
+Write-Host "Done. Rows exported: $($reportDedup.Count)"
 
 
