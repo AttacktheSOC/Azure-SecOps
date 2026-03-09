@@ -122,13 +122,12 @@ resources
             $result = Search-AzGraph -Query $query -Subscription $SubscriptionId -First $PageSize -Skip $skip
             }
         }
-$result
         if ($result -and $result.Data) {
             $all += $result.Data
         }
 
         $skip += $PageSize
-    } while ($result.Count -eq $PageSize)
+    } while ($result.Data.Count -eq $PageSize)
 
     return $all
 }
@@ -474,16 +473,15 @@ for ($i = 0; $i -lt $compute.Count; $i++) {
     $name = [string]$r.name
 
     # Resource-scope GET for VirtualMachines plan
-    $resourcePricingUri = "https://management.azure.com{0}/providers/Microsoft.Security/pricings?api-version=2024-01-01" -f $resourceId
+    $resourcePricingUri = "https://management.azure.com{0}/providers/Microsoft.Security/pricings/VirtualMachines?api-version=2024-01-01" -f $resourceId
 
     # Subscription-scope fallback
-    $subPricingUri = "https://management.azure.com/subscriptions/{0}/providers/Microsoft.Security/pricings?api-version=2024-01-01" -f $subId
+    $subPricingUri = "https://management.azure.com/subscriptions/{0}/providers/Microsoft.Security/pricings/VirtualMachines?api-version=2024-01-01" -f $subId
 
     $pricing = $null
     $sourceScope = "Resource"
 
     try {
-        $resourcePricingUri
         $pricing = Invoke-ArmGetWithRetry -Uri $resourcePricingUri -Token $token -MaxRetry $MaxRetry
     }
     catch {
@@ -553,18 +551,14 @@ for ($i = 0; $i -lt $compute.Count; $i++) {
 
 Write-Progress -Activity "Querying Defender pricing per resource" -Completed
 
-$reportDedup = $report | Group-Object ResourceId | ForEach-Object {
-    $_.Group | Select-Object -First 1
-}
-
 Write-Host "Exporting CSV to: $OutCsv"
-$reportDedup | Sort-Object SubscriptionId, ResourceType, ResourceName |
+$report | Sort-Object SubscriptionId, ResourceType, ResourceName |
     Export-Csv -Path $OutCsv -NoTypeInformation -Encoding UTF8
 
 Write-Host "Exporting HTML to: $OutHtml"
-Export-DefenderServersPricingHtml -Report $reportDedup -OutHtml $OutHtml
+Export-DefenderServersPricingHtml -Report $report -OutHtml $OutHtml
 Write-Host "Done. HTML exported: $OutHtml"
 
-Write-Host "Done. Rows exported: $($reportDedup.Count)"
+Write-Host "Done. Rows exported: $($report.Count)"
 
 
