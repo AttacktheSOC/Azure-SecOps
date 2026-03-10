@@ -169,6 +169,11 @@ function Export-DefenderServersPricingHtml {
     $planCounts = $Report | Group-Object EffectivePlan | Sort-Object Name
     $subs = $Report | Group-Object SubscriptionId | Sort-Object Name
 
+    # Cost calculation (P1 = $5/month, P2 = $15/month)
+    $totalP1 = ($Report | Where-Object { $_.EffectivePlan -eq "P1" }).Count
+    $totalP2 = ($Report | Where-Object { $_.EffectivePlan -eq "P2" }).Count
+    $totalEstCost = ($totalP1 * 5) + ($totalP2 * 15)
+
     # ----------------------------
     # Trusted CDNs (explicit sources)
     # ----------------------------
@@ -347,6 +352,7 @@ div.dataTables_wrapper .dataTables_length select{
         $badgeClass = switch ($name) { "P2"{"bg-success"} "P1"{"bg-warning text-dark"} "Free"{"bg-secondary"} default{"bg-danger"} }
         [void]$sb.AppendLine("  <div class='col-12 col-md-3'><div class='card p-3'><div class='small-muted'>EffectivePlan</div><div class='fs-4 fw-bold'>$(HtmlEncode $name) <span class='badge $badgeClass badge-plan'>$count</span></div></div></div>")
     }
+    [void]$sb.AppendLine("  <div class='col-12 col-md-3'><div class='card p-3 border-info'><div class='small-muted'>Est. Monthly Cost</div><div class='fs-4 fw-bold text-info'>`$$totalEstCost</div><div class='small-muted mt-1'>P1: $totalP1 &times; `$5 &nbsp;|&nbsp; P2: $totalP2 &times; `$15</div></div></div>")
     [void]$sb.AppendLine("</div>")
 
     # Tabs: button is ONLY the subscription id text, external link is separate
@@ -376,6 +382,11 @@ div.dataTables_wrapper .dataTables_length select{
 
         $rows = $subs[$i].Group | Sort-Object ResourceType, ResourceName
         $tableId = "tbl_$safe"
+
+        # Per-subscription cost calculation
+        $subP1 = ($rows | Where-Object { $_.EffectivePlan -eq "P1" }).Count
+        $subP2 = ($rows | Where-Object { $_.EffectivePlan -eq "P2" }).Count
+        $subEstCost = ($subP1 * 5) + ($subP2 * 15)
 
         [void]$sb.AppendLine("<div class='tab-pane fade $activePane' id='pane-$safe' role='tabpanel' aria-labelledby='tab-$safe'>")
         [void]$sb.AppendLine("  <div class='table-responsive'>")
@@ -416,6 +427,12 @@ div.dataTables_wrapper .dataTables_length select{
         }
 
         [void]$sb.AppendLine("      </tbody></table>")
+        [void]$sb.AppendLine("  </div>")
+        [void]$sb.AppendLine("  <div class='d-flex justify-content-end mt-2'>")
+        [void]$sb.AppendLine("    <div class='card p-2 px-3 border-info text-end'>")
+        [void]$sb.AppendLine("      <div class='small-muted'>Estimated Monthly Cost</div>")
+        [void]$sb.AppendLine("      <div class='fw-bold text-info'>P1: $subP1 &times; `$5 = `$$($subP1 * 5) &nbsp;|&nbsp; P2: $subP2 &times; `$15 = `$$($subP2 * 15) &nbsp;|&nbsp; <span class='fs-5'>Total: `$$subEstCost</span></div>")
+        [void]$sb.AppendLine("    </div>")
         [void]$sb.AppendLine("  </div>")
         [void]$sb.AppendLine("</div>")
     }
