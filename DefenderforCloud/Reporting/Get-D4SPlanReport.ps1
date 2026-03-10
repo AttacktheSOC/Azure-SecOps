@@ -262,11 +262,11 @@ div.dataTables_wrapper .dataTables_length select{
       lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
       dom: "Bfrtip",
       buttons: [
-        { extend: "copy", className: "btn btn-sm btn-outline-secondary" },
-        { extend: "csv",  className: "btn btn-sm btn-outline-secondary" },
-        { extend: "excel", className: "btn btn-sm btn-outline-secondary", title: "DefenderForServersPricing" },
-        { extend: "print", className: "btn btn-sm btn-outline-secondary" },
-        { extend: "colvis", className: "btn btn-sm btn-outline-secondary" }
+        { extend: "copy", className: "btn btn-sm" },
+        { extend: "csv",  className: "btn btn-sm" },
+        { extend: "excel", className: "btn btn-sm", title: "DefenderForServersPricing" },
+        { extend: "print", className: "btn btn-sm" },
+        { extend: "colvis", className: "btn btn-sm" }
       ],
       order: [[0, "desc"]],
       autoWidth: false
@@ -352,7 +352,7 @@ div.dataTables_wrapper .dataTables_length select{
         $badgeClass = switch ($name) { "P2"{"bg-success"} "P1"{"bg-warning text-dark"} "Free"{"bg-secondary"} default{"bg-danger"} }
         [void]$sb.AppendLine("  <div class='col-12 col-md-3'><div class='card p-3'><div class='small-muted'>EffectivePlan</div><div class='fs-4 fw-bold'>$(HtmlEncode $name) <span class='badge $badgeClass badge-plan'>$count</span></div></div></div>")
     }
-    [void]$sb.AppendLine("  <div class='col-12 col-md-3'><div class='card p-3 border-info'><div class='small-muted'>Est. Monthly Cost</div><div class='fs-4 fw-bold text-info'>`$$totalEstCost</div><div class='small-muted mt-1'>P1: $totalP1 &times; `$5 &nbsp;|&nbsp; P2: $totalP2 &times; `$15</div></div></div>")
+    [void]$sb.AppendLine("  <div class='col-12 col-md-3'><div class='card p-3 border-info'><div class='small-muted'>Est. Monthly Cost</div><div class='fs-4 fw-bold text-info'>`$$totalEstCost</div></div></div>")
     [void]$sb.AppendLine("</div>")
 
     # Tabs: button is ONLY the subscription id text, external link is separate
@@ -431,7 +431,7 @@ div.dataTables_wrapper .dataTables_length select{
         [void]$sb.AppendLine("  <div class='d-flex justify-content-end mt-2'>")
         [void]$sb.AppendLine("    <div class='card p-2 px-3 border-info text-end'>")
         [void]$sb.AppendLine("      <div class='small-muted'>Estimated Monthly Cost</div>")
-        [void]$sb.AppendLine("      <div class='fw-bold text-info'>P1: $subP1 &times; `$5 = `$$($subP1 * 5) &nbsp;|&nbsp; P2: $subP2 &times; `$15 = `$$($subP2 * 15) &nbsp;|&nbsp; <span class='fs-5'>Total: `$$subEstCost</span></div>")
+        [void]$sb.AppendLine("      <div class='fw-bold text-info'><span class='fs-5'>Total: `$$subEstCost</span></div>")
         [void]$sb.AppendLine("    </div>")
         [void]$sb.AppendLine("  </div>")
         [void]$sb.AppendLine("</div>")
@@ -577,5 +577,4 @@ Export-DefenderServersPricingHtml -Report $report -OutHtml $OutHtml
 Write-Host "Done. HTML exported: $OutHtml"
 
 Write-Host "Done. Rows exported: $($report.Count)"
-
 
