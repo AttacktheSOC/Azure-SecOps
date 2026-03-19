@@ -2,6 +2,8 @@
 
 Generates a per-machine report of Microsoft Defender for Servers pricing (P1 / P2 / Free) for Azure VMs and Azure Arc-enabled servers, exporting results to CSV (Excel-friendly) and an optional interactive HTML report.
 
+![HTML D4S report](/DefenderforCloud/Reporting/dashboard.png)
+
 ---
 
 ## What it does
