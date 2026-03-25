@@ -1,0 +1,29 @@
+// Modified version of the Azure Monitor Community query: https://github.com/microsoft/AzureMonitorCommunity/blob/1bb52a732a0e04c3bff27a9362ac797d988ef3c4/Scenarios/How%20to%20analyze%20log%20ingestion%20and%20billing/Queries/Ingestion%20volume%20spikes%20%20by%20Solution%20and%20data%20type.kql
+// Detect ingestion spikes by Table (DataType), using time-series + trend fit.
+let StartTime = ago(24h);
+let EndTime   = now();
+// MinRSquare = model-fit confidence threshold (higher = stricter) (High: 0.7 - 0.9) (Low: 0.1 - 0.4)
+let MinRSquare   = 0.8;
+// Minimum average volume in GBs (filters tiny / sporadic tables)
+let minAvgVolume = 20;
+Usage
+| where TimeGenerated between (StartTime .. EndTime)
+// 10-minute ingestion volume series per DataType (missing bins -> 0)
+| make-series VolumeSeries = sum(Quantity / 1024) default=0
+    on TimeGenerated in range(StartTime, EndTime, 10m)
+    by DataType
+// Two-line fit (detects a change point)
+| extend (RSquare2, SplitIdx, Variance2, RVariance2, LineFit2) = series_fit_2lines(VolumeSeries)
+// Trend direction on fitted series (Slope > 0 = increasing)
+| extend (Slope, Interception, RSquare, Variance, RVariance, LineFit) = series_fit_line(LineFit2)
+// Average volume across the series (used to suppress low-volume noise)
+| extend AvgVolume = series_stats_dynamic(VolumeSeries).avg
+| project
+    DataType,
+    RSquare2,
+    Slope,
+    SplitIdx,
+    AvgVolume,
+    VolumeSeries,
+    Spike = iff(RSquare2 > MinRSquare and Slope > 0 and AvgVolume > minAvgVolume, "Spike detected", "No spike")
+| where Spike == "Spike detected"
