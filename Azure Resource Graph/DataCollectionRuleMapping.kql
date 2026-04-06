@@ -1,0 +1,174 @@
+resources
+    | where type =~ 'microsoft.insights/datacollectionrules'
+    | mv-expand ds = properties.dataSources.syslog
+    | mv-expand stream = ds.streams
+    | where tostring(stream) !has "CommonSecurityLog"
+    | extend
+        DcrName = name,
+        DcrId = id,
+        DataSourceName = tostring(ds.name),
+        Stream = tostring(stream),
+        Facilities = replace(@",", ", ", replace(@"\[|\]|""", "", tostring(ds.facilityNames))),
+        SeverityLevels = replace(@",", ", ", replace(@"\[|\]|""", "", tostring(ds.logLevels))),
+        ItemType = "Syslog",
+        XPathQuery = "",
+        TransformAppliesTo = "",
+        Destinations = "",
+        OutputStream = "",
+        BuiltInTransform = "",
+        TransformKql = "",
+        ReferenceText = strcat(
+            "Facilities: ", tostring(replace(@",", ", ", replace(@"\[|\]|""", "", tostring(ds.facilityNames)))),
+            " | Severities: ", tostring(replace(@",", ", ", replace(@"\[|\]|""", "", tostring(ds.logLevels)))),
+            " | Stream: ", tostring(stream)
+        )
+    | project
+        subscriptionId,
+        resourceGroup,
+        location,
+        DcrName,
+        DcrId,
+        ItemType,
+        DataSourceName,
+        Stream,
+        Facilities,
+        SeverityLevels,
+        XPathQuery,
+        TransformAppliesTo,
+        Destinations,
+        OutputStream,
+        BuiltInTransform,
+        TransformKql,
+        ReferenceText
+|union (
+    resources
+    | where type =~ 'microsoft.insights/datacollectionrules'
+    | mv-expand ds = properties.dataSources.syslog
+    | mv-expand stream = ds.streams
+    | where tostring(stream) has "CommonSecurityLog"
+    | extend
+        DcrName = name,
+        DcrId = id,
+        DataSourceName = tostring(ds.name),
+        Stream = tostring(stream),
+        Facilities = replace(@",", ", ", replace(@"\[|\]|""", "", tostring(ds.facilityNames))),
+        SeverityLevels = replace(@",", ", ", replace(@"\[|\]|""", "", tostring(ds.logLevels))),
+        ItemType = "Syslog (CEF)",
+        XPathQuery = "",
+        TransformAppliesTo = "",
+        Destinations = "",
+        OutputStream = "",
+        BuiltInTransform = "",
+        TransformKql = "",
+        ReferenceText = strcat(
+            "Facilities: ", tostring(replace(@",", ", ", replace(@"\[|\]|""", "", tostring(ds.facilityNames)))),
+            " | Severities: ", tostring(replace(@",", ", ", replace(@"\[|\]|""", "", tostring(ds.logLevels)))),
+            " | Stream: ", tostring(stream)
+        )
+    | project
+        subscriptionId,
+        resourceGroup,
+        location,
+        DcrName,
+        DcrId,
+        ItemType,
+        DataSourceName,
+        Stream,
+        Facilities,
+        SeverityLevels,
+        XPathQuery,
+        TransformAppliesTo,
+        Destinations,
+        OutputStream,
+        BuiltInTransform,
+        TransformKql,
+        ReferenceText
+),
+(
+    resources
+    | where type =~ 'microsoft.insights/datacollectionrules'
+    | mv-expand ds = properties.dataSources.windowsEventLogs
+    | mv-expand stream = ds.streams
+    | mv-expand xpath = ds.xPathQueries
+    | extend
+        DcrName = name,
+        DcrId = id,
+        DataSourceName = tostring(ds.name),
+        Stream = tostring(stream),
+        Facilities = "",
+        SeverityLevels = "",
+        XPathQuery = tostring(xpath),
+        ItemType = "Windows Event",
+        TransformAppliesTo = "",
+        Destinations = "",
+        OutputStream = "",
+        BuiltInTransform = "",
+        TransformKql = "",
+        ReferenceText = strcat(
+            "XPath/Event filter: ", tostring(xpath),
+            " | Stream: ", tostring(stream)
+        )
+    | project
+        subscriptionId,
+        resourceGroup,
+        location,
+        DcrName,
+        DcrId,
+        ItemType,
+        DataSourceName,
+        Stream,
+        Facilities,
+        SeverityLevels,
+        XPathQuery,
+        TransformAppliesTo,
+        Destinations,
+        OutputStream,
+        BuiltInTransform,
+        TransformKql,
+        ReferenceText
+),
+(
+    resources
+    | where type =~ 'microsoft.insights/datacollectionrules'
+    | mv-expand df = properties.dataFlows
+    | mv-expand appliedStream = df.streams
+    | where isnotempty(tostring(df.transformKql)) or isnotempty(tostring(df.builtInTransform))
+    | extend
+        DcrName = name,
+        DcrId = id,
+        DataSourceName = "dataFlow",
+        Stream = tostring(appliedStream),
+        Facilities = "",
+        SeverityLevels = "",
+        XPathQuery = "",
+        ItemType = "Transform",
+        TransformAppliesTo = tostring(appliedStream),
+        Destinations = replace(@",", ", ", replace(@"\[|\]|""", "", tostring(df.destinations))),
+        OutputStream = tostring(df.outputStream),
+        BuiltInTransform = tostring(df.builtInTransform),
+        TransformKql = tostring(df.transformKql),
+        ReferenceText = strcat(
+            "Applies to stream: ", tostring(appliedStream),
+            " | Destinations: ", replace(@",", ", ", replace(@"\[|\]|""", "", tostring(df.destinations))),
+            " | Output stream: ", tostring(df.outputStream)
+        )
+    | project
+        subscriptionId,
+        resourceGroup,
+        location,
+        DcrName,
+        DcrId,
+        ItemType,
+        DataSourceName,
+        Stream,
+        Facilities,
+        SeverityLevels,
+        XPathQuery,
+        TransformAppliesTo,
+        Destinations,
+        OutputStream,
+        BuiltInTransform,
+        TransformKql,
+        ReferenceText
+)
+| order by subscriptionId asc, resourceGroup asc, DcrName asc, ItemType asc, DataSourceName asc
