@@ -1,0 +1,732 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "description": "Deploys a Logic App that queries Azure Cost Management for Sentinel resource group costs, queries Log Analytics for top table ingestion trends with sparklines, generates an HTML report, and emails it on a weekly schedule via Office 365 Outlook.",
+    "author": "Sentinel Cost Reporting"
+  },
+  "parameters": {
+    "logicAppName": {
+      "type": "string",
+      "defaultValue": "SentinelCostReport",
+      "metadata": {
+        "description": "Name of the Logic App resource."
+      }
+    },
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "Azure region for all resources."
+      }
+    },
+    "sentinelResourceGroupName": {
+      "type": "string",
+      "metadata": {
+        "description": "Name of the resource group containing Sentinel and related resources. Cost queries are scoped to this RG."
+      }
+    },
+    "sentinelSubscriptionId": {
+      "type": "string",
+      "defaultValue": "[subscription().subscriptionId]",
+      "metadata": {
+        "description": "Subscription ID containing the Sentinel resource group. Defaults to the current subscription."
+      }
+    },
+    "logAnalyticsWorkspaceId": {
+      "type": "string",
+      "metadata": {
+        "description": "Workspace ID (GUID) of the Log Analytics workspace. Found in Azure Portal under Log Analytics workspace > Properties > Workspace ID."
+      }
+    },
+    "lookbackDays": {
+      "type": "int",
+      "defaultValue": 30,
+      "minValue": 1,
+      "maxValue": 90,
+      "metadata": {
+        "description": "Number of days to look back for cost and ingestion data."
+      }
+    },
+    "topNTables": {
+      "type": "int",
+      "defaultValue": 10,
+      "minValue": 1,
+      "maxValue": 50,
+      "metadata": {
+        "description": "Number of top ingestion tables to display in the report."
+      }
+    },
+    "scheduleDay": {
+      "type": "string",
+      "defaultValue": "Monday",
+      "allowedValues": [
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+        "Sunday"
+      ],
+      "metadata": {
+        "description": "Day of the week to run the report."
+      }
+    },
+    "scheduleHour": {
+      "type": "int",
+      "defaultValue": 8,
+      "minValue": 0,
+      "maxValue": 23,
+      "metadata": {
+        "description": "Hour (UTC) to run the report."
+      }
+    },
+    "emailRecipients": {
+      "type": "string",
+      "metadata": {
+        "description": "Semicolon-separated list of email recipients for the report."
+      }
+    },
+    "emailSubject": {
+      "type": "string",
+      "defaultValue": "Weekly Sentinel Cost & Ingestion Report",
+      "metadata": {
+        "description": "Subject line prefix for the report email."
+      }
+    },
+    "o365ConnectionName": {
+      "type": "string",
+      "defaultValue": "office365-sentinel-report",
+      "metadata": {
+        "description": "Name of the Office 365 Outlook API connection resource."
+      }
+    }
+  },
+  "variables": {
+    "costManagementReaderRoleId": "72fafb9e-0641-4937-9268-a91bfd8191a3",
+    "logAnalyticsReaderRoleId": "73c42c96-874c-492b-b04d-ab87d138a893",
+    "sentinelResourceGroupId": "[concat('/subscriptions/', parameters('sentinelSubscriptionId'), '/resourceGroups/', parameters('sentinelResourceGroupName'))]",
+    "roleAssignmentGuid": "[guid(parameters('sentinelResourceGroupName'), variables('costManagementReaderRoleId'), parameters('logicAppName'))]",
+    "laRoleAssignmentGuid": "[guid(parameters('sentinelResourceGroupName'), variables('logAnalyticsReaderRoleId'), parameters('logicAppName'))]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Web/connections",
+      "apiVersion": "2016-06-01",
+      "name": "[parameters('o365ConnectionName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "displayName": "Office 365 Outlook - Sentinel Cost Report",
+        "api": {
+          "id": "[subscriptionResourceId('Microsoft.Web/locations/managedApis', parameters('location'), 'office365')]"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Logic/workflows",
+      "apiVersion": "2019-05-01",
+      "name": "[parameters('logicAppName')]",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/connections', parameters('o365ConnectionName'))]"
+      ],
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "properties": {
+        "state": "Enabled",
+        "definition": {
+          "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+          "contentVersion": "1.0.0.0",
+          "parameters": {
+            "$connections": {
+              "defaultValue": {},
+              "type": "Object"
+            },
+            "sentinelSubscriptionId": {
+              "type": "String"
+            },
+            "sentinelResourceGroupName": {
+              "type": "String"
+            },
+            "logAnalyticsWorkspaceId": {
+              "type": "String"
+            },
+            "lookbackDays": {
+              "type": "Int"
+            },
+            "topNTables": {
+              "type": "Int"
+            },
+            "emailRecipients": {
+              "type": "String"
+            },
+            "emailSubject": {
+              "type": "String"
+            }
+          },
+          "triggers": {
+            "Recurrence": {
+              "type": "Recurrence",
+              "recurrence": {
+                "frequency": "Week",
+                "interval": 1,
+                "schedule": {
+                  "weekDays": [
+                    "[parameters('scheduleDay')]"
+                  ],
+                  "hours": [
+                    "[parameters('scheduleHour')]"
+                  ]
+                },
+                "timeZone": "UTC"
+              }
+            }
+          },
+          "actions": {
+            "HTTP_Get_Daily_Costs": {
+              "type": "Http",
+              "runAfter": {},
+              "inputs": {
+                "method": "POST",
+                "uri": "https://management.azure.com/subscriptions/@{parameters('sentinelSubscriptionId')}/resourceGroups/@{encodeUriComponent(parameters('sentinelResourceGroupName'))}/providers/Microsoft.CostManagement/query?api-version=2023-11-01",
+                "authentication": {
+                  "type": "ManagedServiceIdentity",
+                  "audience": "https://management.azure.com/"
+                },
+                "body": {
+                  "type": "ActualCost",
+                  "timeframe": "Custom",
+                  "timePeriod": {
+                    "from": "@{concat(formatDateTime(addDays(utcNow(), mul(-1, parameters('lookbackDays'))), 'yyyy-MM-dd'), 'T00:00:00Z')}",
+                    "to": "@{concat(formatDateTime(utcNow(), 'yyyy-MM-dd'), 'T23:59:59Z')}"
+                  },
+                  "dataset": {
+                    "granularity": "Daily",
+                    "aggregation": {
+                      "totalCost": {
+                        "name": "PreTaxCost",
+                        "function": "Sum"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "HTTP_Get_Service_Costs": {
+              "type": "Http",
+              "runAfter": {},
+              "inputs": {
+                "method": "POST",
+                "uri": "https://management.azure.com/subscriptions/@{parameters('sentinelSubscriptionId')}/resourceGroups/@{encodeUriComponent(parameters('sentinelResourceGroupName'))}/providers/Microsoft.CostManagement/query?api-version=2023-11-01",
+                "authentication": {
+                  "type": "ManagedServiceIdentity",
+                  "audience": "https://management.azure.com/"
+                },
+                "body": {
+                  "type": "ActualCost",
+                  "timeframe": "Custom",
+                  "timePeriod": {
+                    "from": "@{concat(formatDateTime(addDays(utcNow(), mul(-1, parameters('lookbackDays'))), 'yyyy-MM-dd'), 'T00:00:00Z')}",
+                    "to": "@{concat(formatDateTime(utcNow(), 'yyyy-MM-dd'), 'T23:59:59Z')}"
+                  },
+                  "dataset": {
+                    "aggregation": {
+                      "totalCost": {
+                        "name": "PreTaxCost",
+                        "function": "Sum"
+                      }
+                    },
+                    "grouping": [
+                      {
+                        "type": "Dimension",
+                        "name": "ServiceName"
+                      },
+                      {
+                        "type": "Dimension",
+                        "name": "MeterSubCategory"
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            "HTTP_Get_Table_Ingestion": {
+              "type": "Http",
+              "runAfter": {},
+              "inputs": {
+                "method": "POST",
+                "uri": "https://api.loganalytics.io/v1/workspaces/@{parameters('logAnalyticsWorkspaceId')}/query",
+                "authentication": {
+                  "type": "ManagedServiceIdentity",
+                  "audience": "https://api.loganalytics.io"
+                },
+                "body": {
+                  "query": "let topN = @{parameters('topNTables')}; let lookbackDays = @{parameters('lookbackDays')}d; let barMaxHeight = 40; let startTime = startofday(ago(lookbackDays)); let endTime = startofday(now()); let topTables = Usage | where TimeGenerated > startTime | where IsBillable == true | summarize TotalMB = sum(Quantity) by DataType | top topN by TotalMB desc | project DataType; let globalMaxRaw = toscalar(Usage | where TimeGenerated > startTime | where IsBillable == true | where DataType in (topTables) | summarize DailyMB = sum(Quantity) by bin(TimeGenerated, 1d) | summarize max(DailyMB)); let globalMax = iff(isnull(globalMaxRaw) or globalMaxRaw == 0.0, 1.0, globalMaxRaw); Usage | where TimeGenerated > startTime | where IsBillable == true | where DataType in (topTables) | make-series DailySeries=sum(Quantity) default=0 on TimeGenerated from startTime to endTime step 1d by DataType | extend TotalGB = round(array_sum(DailySeries) / 1024.0, 2) | extend DayCount = array_length(DailySeries) | mv-apply val = DailySeries to typeof(real), ts = TimeGenerated to typeof(datetime) on (extend BarH = max_of(2, toint(round(val / globalMax * toreal(barMaxHeight), 0))) | extend Bar = strcat('<td style=\"vertical-align:bottom;padding:0 1px;\"><div style=\"width:6px;height:', tostring(BarH), 'px;background-color:#0078D4;\" title=\"', format_datetime(ts, 'MM/dd'), ': ', tostring(round(val/1024.0,3)), ' GB\"></div></td>') | summarize Sparkline = strcat_array(make_list(Bar), '')) | extend AvgDailyGB = round(TotalGB / max_of(1, DayCount), 2) | project DataType, TotalGB, AvgDailyGB, Sparkline | order by TotalGB desc"
+                }
+              }
+            },
+            "Init_TotalCost": {
+              "type": "InitializeVariable",
+              "runAfter": {},
+              "inputs": {
+                "variables": [
+                  {
+                    "name": "totalCost",
+                    "type": "float",
+                    "value": 0
+                  }
+                ]
+              }
+            },
+            "Init_MaxDailyCost": {
+              "type": "InitializeVariable",
+              "runAfter": {},
+              "inputs": {
+                "variables": [
+                  {
+                    "name": "maxDailyCost",
+                    "type": "float",
+                    "value": 0.01
+                  }
+                ]
+              }
+            },
+            "Init_HtmlDailyChart": {
+              "type": "InitializeVariable",
+              "runAfter": {},
+              "inputs": {
+                "variables": [
+                  {
+                    "name": "htmlDailyChart",
+                    "type": "string",
+                    "value": ""
+                  }
+                ]
+              }
+            },
+            "Init_HtmlServiceTable": {
+              "type": "InitializeVariable",
+              "runAfter": {},
+              "inputs": {
+                "variables": [
+                  {
+                    "name": "htmlServiceTable",
+                    "type": "string",
+                    "value": ""
+                  }
+                ]
+              }
+            },
+            "Init_MaxServiceCost": {
+              "type": "InitializeVariable",
+              "runAfter": {},
+              "inputs": {
+                "variables": [
+                  {
+                    "name": "maxServiceCost",
+                    "type": "float",
+                    "value": 0.01
+                  }
+                ]
+              }
+            },
+            "Init_HtmlIngestionTable": {
+              "type": "InitializeVariable",
+              "runAfter": {},
+              "inputs": {
+                "variables": [
+                  {
+                    "name": "htmlIngestionTable",
+                    "type": "string",
+                    "value": ""
+                  }
+                ]
+              }
+            },
+            "Select_Daily_Rows": {
+              "type": "Select",
+              "runAfter": {
+                "HTTP_Get_Daily_Costs": [
+                  "Succeeded"
+                ]
+              },
+              "inputs": {
+                "from": "@body('HTTP_Get_Daily_Costs')?['properties']?['rows']",
+                "select": {
+                  "cost": "@item()[0]",
+                  "date": "@if(contains(string(item()[1]),'-'),substring(string(item()[1]),0,10),concat(substring(string(item()[1]),0,4),'-',substring(string(item()[1]),4,2),'-',substring(string(item()[1]),6,2)))"
+                }
+              }
+            },
+            "Select_Service_Rows": {
+              "type": "Select",
+              "runAfter": {
+                "HTTP_Get_Service_Costs": [
+                  "Succeeded"
+                ]
+              },
+              "inputs": {
+                "from": "@body('HTTP_Get_Service_Costs')?['properties']?['rows']",
+                "select": {
+                  "cost": "@item()[0]",
+                  "serviceName": "@item()[1]",
+                  "meter": "@item()[2]"
+                }
+              }
+            },
+            "Select_Ingestion_Rows": {
+              "type": "Select",
+              "runAfter": {
+                "HTTP_Get_Table_Ingestion": [
+                  "Succeeded"
+                ]
+              },
+              "inputs": {
+                "from": "@body('HTTP_Get_Table_Ingestion')?['tables']?[0]?['rows']",
+                "select": {
+                  "dataType": "@item()[0]",
+                  "totalGB": "@item()[1]",
+                  "avgDailyGB": "@item()[2]",
+                  "sparkline": "@item()[3]"
+                }
+              }
+            },
+            "Compute_Daily_Stats": {
+              "type": "Foreach",
+              "runAfter": {
+                "Select_Daily_Rows": [
+                  "Succeeded"
+                ],
+                "Init_TotalCost": [
+                  "Succeeded"
+                ]
+              },
+              "foreach": "@body('Select_Daily_Rows')",
+              "actions": {
+                "Increment_TotalCost": {
+                  "type": "IncrementVariable",
+                  "runAfter": {},
+                  "inputs": {
+                    "name": "totalCost",
+                    "value": "@float(items('Compute_Daily_Stats')?['cost'])"
+                  }
+                }
+              },
+              "operationOptions": "Sequential"
+            },
+            "Filter_Last_7_Days": {
+              "type": "Query",
+              "runAfter": {
+                "Select_Daily_Rows": [
+                  "Succeeded"
+                ]
+              },
+              "inputs": {
+                "from": "@body('Select_Daily_Rows')",
+                "where": "@greaterOrEquals(item()?['date'], formatDateTime(addDays(utcNow(), -7), 'yyyy-MM-dd'))"
+              }
+            },
+            "Compute_7Day_Max": {
+              "type": "Foreach",
+              "runAfter": {
+                "Filter_Last_7_Days": [
+                  "Succeeded"
+                ],
+                "Init_MaxDailyCost": [
+                  "Succeeded"
+                ]
+              },
+              "foreach": "@body('Filter_Last_7_Days')",
+              "actions": {
+                "Compose_New7DayMax": {
+                  "type": "Compose",
+                  "runAfter": {},
+                  "inputs": "@if(greater(float(items('Compute_7Day_Max')?['cost']),variables('maxDailyCost')),float(items('Compute_7Day_Max')?['cost']),variables('maxDailyCost'))"
+                },
+                "Set_7DayMax": {
+                  "type": "SetVariable",
+                  "runAfter": {
+                    "Compose_New7DayMax": [
+                      "Succeeded"
+                    ]
+                  },
+                  "inputs": {
+                    "name": "maxDailyCost",
+                    "value": "@outputs('Compose_New7DayMax')"
+                  }
+                }
+              },
+              "operationOptions": "Sequential"
+            },
+            "Build_Daily_Chart": {
+              "type": "Foreach",
+              "runAfter": {
+                "Compute_7Day_Max": [
+                  "Succeeded"
+                ],
+                "Init_HtmlDailyChart": [
+                  "Succeeded"
+                ]
+              },
+              "foreach": "@body('Filter_Last_7_Days')",
+              "actions": {
+                "Append_Daily_Bar": {
+                  "type": "AppendToStringVariable",
+                  "runAfter": {},
+                  "inputs": {
+                    "name": "htmlDailyChart",
+                    "value": "<tr><td width='80' style='padding:3px 4px;font-size:12px;font-family:Segoe UI,Arial,sans-serif;color:#333333;white-space:nowrap;'>@{items('Build_Daily_Chart')?['date']}</td><td style='padding:3px 4px;'><div style='background-color:#0078D4;height:18px;width:@{div(mul(float(items('Build_Daily_Chart')?['cost']),350),variables('maxDailyCost'))}px;'>&nbsp;</div></td><td width='90' style='padding:3px 4px;font-size:12px;font-family:Segoe UI,Arial,sans-serif;color:#333333;text-align:right;white-space:nowrap;'>$@{formatNumber(float(items('Build_Daily_Chart')?['cost']),'N2')}</td></tr>"
+                  }
+                }
+              },
+              "operationOptions": "Sequential"
+            },
+            "Compute_Service_Max": {
+              "type": "Foreach",
+              "runAfter": {
+                "Select_Service_Rows": [
+                  "Succeeded"
+                ],
+                "Init_MaxServiceCost": [
+                  "Succeeded"
+                ]
+              },
+              "foreach": "@body('Select_Service_Rows')",
+              "actions": {
+                "Compose_NewMaxService": {
+                  "type": "Compose",
+                  "runAfter": {},
+                  "inputs": "@if(greater(float(items('Compute_Service_Max')?['cost']),variables('maxServiceCost')),float(items('Compute_Service_Max')?['cost']),variables('maxServiceCost'))"
+                },
+                "Update_MaxServiceCost": {
+                  "type": "SetVariable",
+                  "runAfter": {
+                    "Compose_NewMaxService": [
+                      "Succeeded"
+                    ]
+                  },
+                  "inputs": {
+                    "name": "maxServiceCost",
+                    "value": "@outputs('Compose_NewMaxService')"
+                  }
+                }
+              },
+              "operationOptions": "Sequential"
+            },
+            "Build_Service_Table": {
+              "type": "Foreach",
+              "runAfter": {
+                "Compute_Service_Max": [
+                  "Succeeded"
+                ],
+                "Init_HtmlServiceTable": [
+                  "Succeeded"
+                ]
+              },
+              "foreach": "@body('Select_Service_Rows')",
+              "actions": {
+                "Append_Service_Row": {
+                  "type": "AppendToStringVariable",
+                  "runAfter": {},
+                  "inputs": {
+                    "name": "htmlServiceTable",
+                    "value": "<tr><td style='padding:8px 12px;border-bottom:1px solid #E8E8E8;font-size:13px;font-family:Segoe UI,Arial,sans-serif;'>@{items('Build_Service_Table')?['serviceName']}</td><td style='padding:8px 12px;border-bottom:1px solid #E8E8E8;font-size:13px;font-family:Segoe UI,Arial,sans-serif;'>@{items('Build_Service_Table')?['meter']}</td><td style='padding:8px 12px;border-bottom:1px solid #E8E8E8;font-size:13px;font-family:Segoe UI,Arial,sans-serif;text-align:right;white-space:nowrap;'>$@{formatNumber(float(items('Build_Service_Table')?['cost']),'N2')}</td><td style='padding:8px 12px;border-bottom:1px solid #E8E8E8;'><div style='background-color:#50C878;height:14px;width:@{div(mul(float(items('Build_Service_Table')?['cost']),250),variables('maxServiceCost'))}px;'>&nbsp;</div></td></tr>"
+                  }
+                }
+              },
+              "operationOptions": "Sequential"
+            },
+            "Build_Ingestion_Table": {
+              "type": "Foreach",
+              "runAfter": {
+                "Select_Ingestion_Rows": [
+                  "Succeeded"
+                ],
+                "Init_HtmlIngestionTable": [
+                  "Succeeded"
+                ]
+              },
+              "foreach": "@body('Select_Ingestion_Rows')",
+              "actions": {
+                "Append_Ingestion_Row": {
+                  "type": "AppendToStringVariable",
+                  "runAfter": {},
+                  "inputs": {
+                    "name": "htmlIngestionTable",
+                    "value": "<tr><td style='padding:8px 12px;border-bottom:1px solid #E8E8E8;font-size:13px;font-weight:600;font-family:Segoe UI,Arial,sans-serif;color:#0078D4;'>@{items('Build_Ingestion_Table')?['dataType']}</td><td style='padding:8px 12px;border-bottom:1px solid #E8E8E8;font-size:13px;font-family:Segoe UI,Arial,sans-serif;text-align:right;'>@{formatNumber(float(items('Build_Ingestion_Table')?['totalGB']),'N2')} GB</td><td style='padding:8px 12px;border-bottom:1px solid #E8E8E8;font-size:13px;font-family:Segoe UI,Arial,sans-serif;text-align:right;'>@{formatNumber(float(items('Build_Ingestion_Table')?['avgDailyGB']),'N2')} GB</td><td style='padding:8px 12px;border-bottom:1px solid #E8E8E8;vertical-align:bottom;'><table cellpadding='0' cellspacing='0' border='0'><tr style='vertical-align:bottom;'>@{items('Build_Ingestion_Table')?['sparkline']}</tr></table></td></tr>"
+                  }
+                }
+              },
+              "operationOptions": "Sequential"
+            },
+            "Compose_HTML_Report": {
+              "type": "Compose",
+              "runAfter": {
+                "Build_Daily_Chart": [
+                  "Succeeded"
+                ],
+                "Build_Service_Table": [
+                  "Succeeded"
+                ],
+                "Build_Ingestion_Table": [
+                  "Succeeded"
+                ],
+                "Compute_Daily_Stats": [
+                  "Succeeded"
+                ]
+              },
+              "inputs": "<!DOCTYPE html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1.0'></head><body style='margin:0;padding:0;background-color:#f5f5f5;font-family:Segoe UI,Arial,sans-serif;'><table width='100%' cellpadding='0' cellspacing='0' border='0' style='background-color:#f5f5f5;'><tr><td align='center' style='padding:20px 0;'><table width='800' cellpadding='0' cellspacing='0' border='0' style='background-color:#ffffff;border-radius:8px;overflow:hidden;'><tr><td style='background-color:#0078D4;padding:24px 32px;'><h1 style='margin:0;color:#ffffff;font-size:22px;font-weight:600;font-family:Segoe UI,Arial,sans-serif;'>@{parameters('emailSubject')}</h1><p style='margin:6px 0 0;color:#B4D7EF;font-size:14px;font-family:Segoe UI,Arial,sans-serif;'>@{formatDateTime(addDays(utcNow(),mul(-1,parameters('lookbackDays'))),'MMMM d, yyyy')} &mdash; @{formatDateTime(utcNow(),'MMMM d, yyyy')}</p></td></tr><tr><td style='background-color:#F0F8FF;padding:20px 32px;border-bottom:1px solid #E0E0E0;'><table width='100%' cellpadding='0' cellspacing='0' border='0'><tr><td width='50%' align='center' style='padding:8px;'><div style='font-size:32px;font-weight:700;color:#0078D4;font-family:Segoe UI,Arial,sans-serif;'>$@{formatNumber(variables('totalCost'),'N2')}</div><div style='font-size:11px;color:#666666;text-transform:uppercase;letter-spacing:1px;font-family:Segoe UI,Arial,sans-serif;margin-top:4px;'>Total Cost (@{parameters('lookbackDays')} days)</div></td><td width='50%' align='center' style='padding:8px;'><div style='font-size:18px;font-weight:700;color:#0078D4;font-family:Segoe UI,Arial,sans-serif;'>@{parameters('sentinelResourceGroupName')}</div><div style='font-size:11px;color:#666666;text-transform:uppercase;letter-spacing:1px;font-family:Segoe UI,Arial,sans-serif;margin-top:4px;'>Resource Group</div></td></tr></table></td></tr><tr><td style='padding:24px 32px;'><h2 style='margin:0 0 4px;font-size:16px;font-weight:600;color:#333333;font-family:Segoe UI,Arial,sans-serif;border-bottom:2px solid #0078D4;padding-bottom:8px;'>Top @{parameters('topNTables')} Tables by Ingestion</h2><p style='margin:0 0 12px;font-size:12px;color:#888;font-family:Segoe UI,Arial,sans-serif;'>Billable tables ranked by total volume over the last @{parameters('lookbackDays')} days. Sparklines show daily ingestion patterns.</p><table width='100%' cellpadding='0' cellspacing='0' border='0'><tr style='background-color:#f5f5f5;'><th style='text-align:left;padding:10px 12px;font-size:11px;color:#666666;text-transform:uppercase;font-family:Segoe UI,Arial,sans-serif;border-bottom:2px solid #dddddd;'>Table</th><th style='text-align:right;padding:10px 12px;font-size:11px;color:#666666;text-transform:uppercase;font-family:Segoe UI,Arial,sans-serif;border-bottom:2px solid #dddddd;'>Total (GB)</th><th style='text-align:right;padding:10px 12px;font-size:11px;color:#666666;text-transform:uppercase;font-family:Segoe UI,Arial,sans-serif;border-bottom:2px solid #dddddd;'>Avg/Day</th><th style='text-align:left;padding:10px 12px;font-size:11px;color:#666666;text-transform:uppercase;font-family:Segoe UI,Arial,sans-serif;border-bottom:2px solid #dddddd;'>Ingestion Trend (@{parameters('lookbackDays')}d)</th></tr>@{variables('htmlIngestionTable')}</table></td></tr><tr><td style='padding:24px 32px;'><h2 style='margin:0 0 16px;font-size:16px;font-weight:600;color:#333333;font-family:Segoe UI,Arial,sans-serif;border-bottom:2px solid #0078D4;padding-bottom:8px;'>Daily Cost Trend (Last 7 Days)</h2><table width='100%' cellpadding='0' cellspacing='0' border='0'>@{variables('htmlDailyChart')}</table></td></tr><tr><td style='padding:0 32px 24px 32px;'><h2 style='margin:0 0 16px;font-size:16px;font-weight:600;color:#333333;font-family:Segoe UI,Arial,sans-serif;border-bottom:2px solid #0078D4;padding-bottom:8px;'>Cost by Service &amp; Meter</h2><table width='100%' cellpadding='0' cellspacing='0' border='0'><tr style='background-color:#f5f5f5;'><th style='text-align:left;padding:10px 12px;font-size:11px;color:#666666;text-transform:uppercase;font-family:Segoe UI,Arial,sans-serif;border-bottom:2px solid #dddddd;'>Service</th><th style='text-align:left;padding:10px 12px;font-size:11px;color:#666666;text-transform:uppercase;font-family:Segoe UI,Arial,sans-serif;border-bottom:2px solid #dddddd;'>Meter</th><th style='text-align:right;padding:10px 12px;font-size:11px;color:#666666;text-transform:uppercase;font-family:Segoe UI,Arial,sans-serif;border-bottom:2px solid #dddddd;'>Cost</th><th style='text-align:left;padding:10px 12px;font-size:11px;color:#666666;text-transform:uppercase;font-family:Segoe UI,Arial,sans-serif;border-bottom:2px solid #dddddd;'>Distribution</th></tr>@{variables('htmlServiceTable')}</table></td></tr><tr><td style='background-color:#f5f5f5;padding:16px 32px;text-align:center;font-size:11px;color:#999999;font-family:Segoe UI,Arial,sans-serif;border-top:1px solid #E0E0E0;'>Generated @{utcNow('yyyy-MM-dd HH:mm')} UTC &bull; Cost data: Azure Cost Management API &bull; Ingestion data: Log Analytics Usage table &bull; Scope: @{parameters('sentinelResourceGroupName')}</td></tr></table></td></tr></table></body></html>"
+            },
+            "Send_Email": {
+              "type": "ApiConnection",
+              "runAfter": {
+                "Compose_HTML_Report": [
+                  "Succeeded"
+                ]
+              },
+              "inputs": {
+                "host": {
+                  "connection": {
+                    "name": "@parameters('$connections')['office365']['connectionId']"
+                  }
+                },
+                "method": "post",
+                "path": "/v2/Mail",
+                "body": {
+                  "To": "@parameters('emailRecipients')",
+                  "Subject": "@{concat(parameters('emailSubject'),' - ',formatDateTime(utcNow(),'yyyy-MM-dd'))}",
+                  "Body": "@{outputs('Compose_HTML_Report')}",
+                  "Importance": "Normal"
+                }
+              }
+            }
+          }
+        },
+        "parameters": {
+          "$connections": {
+            "value": {
+              "office365": {
+                "connectionId": "[resourceId('Microsoft.Web/connections', parameters('o365ConnectionName'))]",
+                "connectionName": "[parameters('o365ConnectionName')]",
+                "id": "[subscriptionResourceId('Microsoft.Web/locations/managedApis', parameters('location'), 'office365')]"
+              }
+            }
+          },
+          "sentinelSubscriptionId": {
+            "value": "[parameters('sentinelSubscriptionId')]"
+          },
+          "sentinelResourceGroupName": {
+            "value": "[parameters('sentinelResourceGroupName')]"
+          },
+          "logAnalyticsWorkspaceId": {
+            "value": "[parameters('logAnalyticsWorkspaceId')]"
+          },
+          "lookbackDays": {
+            "value": "[parameters('lookbackDays')]"
+          },
+          "topNTables": {
+            "value": "[parameters('topNTables')]"
+          },
+          "emailRecipients": {
+            "value": "[parameters('emailRecipients')]"
+          },
+          "emailSubject": {
+            "value": "[parameters('emailSubject')]"
+          }
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2022-09-01",
+      "name": "sentinelRgRoleAssignment",
+      "subscriptionId": "[parameters('sentinelSubscriptionId')]",
+      "resourceGroup": "[parameters('sentinelResourceGroupName')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Logic/workflows', parameters('logicAppName'))]"
+      ],
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "principalId": {
+            "value": "[reference(resourceId('Microsoft.Logic/workflows', parameters('logicAppName')), '2019-05-01', 'full').identity.principalId]"
+          },
+          "roleAssignmentGuid": {
+            "value": "[variables('roleAssignmentGuid')]"
+          },
+          "costManagementReaderRoleId": {
+            "value": "[variables('costManagementReaderRoleId')]"
+          },
+          "laRoleAssignmentGuid": {
+            "value": "[variables('laRoleAssignmentGuid')]"
+          },
+          "logAnalyticsReaderRoleId": {
+            "value": "[variables('logAnalyticsReaderRoleId')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "parameters": {
+            "principalId": {
+              "type": "string"
+            },
+            "roleAssignmentGuid": {
+              "type": "string"
+            },
+            "costManagementReaderRoleId": {
+              "type": "string"
+            },
+            "laRoleAssignmentGuid": {
+              "type": "string"
+            },
+            "logAnalyticsReaderRoleId": {
+              "type": "string"
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "name": "[parameters('roleAssignmentGuid')]",
+              "properties": {
+                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', parameters('costManagementReaderRoleId'))]",
+                "principalId": "[parameters('principalId')]",
+                "principalType": "ServicePrincipal"
+              }
+            },
+            {
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "name": "[parameters('laRoleAssignmentGuid')]",
+              "properties": {
+                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', parameters('logAnalyticsReaderRoleId'))]",
+                "principalId": "[parameters('principalId')]",
+                "principalType": "ServicePrincipal"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "outputs": {
+    "logicAppResourceId": {
+      "type": "string",
+      "value": "[resourceId('Microsoft.Logic/workflows', parameters('logicAppName'))]"
+    },
+    "managedIdentityPrincipalId": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Logic/workflows', parameters('logicAppName')), '2019-05-01', 'full').identity.principalId]"
+    },
+    "postDeploymentSteps": {
+      "type": "string",
+      "value": "[concat('1) Authorize the Office 365 API connection in Azure Portal: navigate to resource group > ', resourceGroup().name, ' > ', parameters('o365ConnectionName'), ' > Edit API connection > Authorize > Save. 2) Verify the Cost Management Reader and Log Analytics Reader role assignments on resource group ', parameters('sentinelResourceGroupName'), '. 3) Run the Logic App trigger manually to test.')]"
+    }
+  }
+}
