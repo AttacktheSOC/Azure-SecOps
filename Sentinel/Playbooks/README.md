@@ -8,11 +8,11 @@ Azure Logic Apps deployed as Microsoft Sentinel automation playbooks. Each playb
 
 | Playbook | Trigger | Description |
 |---|---|---|
-| [Formatted-IncidentNotification](#formatted-incidentnotification) | Incident creation | Sends a formatted HTML email notification on new Sentinel incidents |
+| [Formatted Incident Notification](#formatted-incidentnotification) | Incident creation | Sends a formatted HTML email notification on new Sentinel incidents |
 
 ---
 
-## Formatted-IncidentNotification
+## Formatted Incident Notification - Incident trigger
 
 ### Overview
 
@@ -28,7 +28,7 @@ A Logic App triggered by the **Microsoft Sentinel incident-creation webhook**. O
    - MITRE ATT&CK tactics and techniques
    - Entities table (up to 10)
    - Labels section (omitted when empty)
-   - *View in Microsoft Sentinel* CTA button linking to the Defender portal
+   - *View in Microsoft Defender* button linking to the Defender portal
 5. Sends the email via the **Office 365 Outlook** connector (`Send_email_V2`). High-severity incidents set email `Importance: High`.
 
 **Connections required**
