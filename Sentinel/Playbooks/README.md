@@ -8,7 +8,7 @@ Azure Logic Apps deployed as Microsoft Sentinel automation playbooks. Each playb
 
 | Playbook | Trigger | Description |
 |---|---|---|
-| [Formatted Incident Notification](#formatted-incidentnotification) | Incident creation | Sends a formatted HTML email notification on new Sentinel incidents |
+| [Formatted Incident Notification](#formatted-incident-notification---incident-trigger) | Incident creation | Sends a formatted HTML email notification on new Sentinel incidents |
 
 ---
 
