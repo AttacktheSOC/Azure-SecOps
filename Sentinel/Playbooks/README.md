@@ -60,16 +60,10 @@ The Logic App is deployed in a **Disabled** state and must be enabled after post
 1. **Authorize the Office 365 connection**  
    In the Azure portal, navigate to the deployed `office365` API connection → **Edit API connection** → **Authorize**, and sign in with a licensed Microsoft 365 account that has a mailbox. Save the connection.
 
-2. **Grant the Managed Identity the Sentinel Responder role**  
-   The Logic App uses a system-assigned Managed Identity to read incident data from Sentinel. Assign the **Microsoft Sentinel Responder** role to the Logic App's identity on the Log Analytics workspace (or resource group) that hosts your Sentinel instance:
-   ```
-   IAM → Add role assignment → Microsoft Sentinel Responder → Managed identity → <Logic App name>
-   ```
+2. **Enable the Logic App**  
+   The playbook deploys in a disabled state. Once the Office 365 connection is authorized, navigate to the Logic App → **Overview** → **Enable**.
 
-3. **Enable the Logic App**  
-   The playbook deploys in a disabled state. Once the connection and RBAC steps above are complete, navigate to the Logic App → **Overview** → **Enable**.
-
-4. **Attach to a Sentinel Automation Rule**  
+3. **Attach to a Sentinel Automation Rule**  
    In Microsoft Sentinel, go to **Configuration → Automation** → **Create → Automation rule**. Set the trigger to *When incident is created*, add an action of *Run playbook*, and select this Logic App. Scope the rule to the analytic rules or severity levels you want covered.
 
 ---
