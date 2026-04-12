@@ -1,80 +1,104 @@
-# Using the Microsoft Sentinel Workbooks in This Repo
+# Sentinel Workbooks
 
-This folder contains **Microsoft Sentinel workbook templates** (JSON) that you can import into your own Sentinel workspace to visualize and investigate data. [1](https://github.com/AttacktheSOC/Azure-SecOps) [2](https://learn.microsoft.com/en-us/azure/sentinel/monitor-your-data)
-
-> **Good to know:** Sentinel workbooks are built on **Azure Monitor Workbooks** and are saved as **Azure resources**, so you can control access using **Azure RBAC**. [2](https://learn.microsoft.com/en-us/azure/sentinel/monitor-your-data)
+Microsoft Sentinel workbook templates for visualizing and operating on workspace data. Workbooks are Azure Monitor Workbook resources scoped to a Log Analytics workspace and controlled via Azure RBAC.
 
 ---
 
-## Prerequisites
+## Workbooks
 
-- **A Microsoft Sentinel workspace** (Log Analytics workspace with Sentinel enabled). [2](https://learn.microsoft.com/en-us/azure/sentinel/monitor-your-data)  
-- **Data connected** that matches what the workbook queries (for example Entra ID sign-ins, Defender, etc.); otherwise tiles will show “no data” or errors. [2](https://learn.microsoft.com/en-us/azure/sentinel/monitor-your-data)  
-- **Permissions**: at minimum **Workbook Reader** to view and **Workbook Contributor** to create/edit (at the workspace resource group scope). [2](https://learn.microsoft.com/en-us/azure/sentinel/monitor-your-data)  
+### 1. Modified WAF Events
 
----
+**File:** `Modified WAF Events playbook.json` (ARM template)
 
-## Where to Use Workbooks (Portal Notes)
+**Description:** Visualizes Azure Web Application Firewall (WAF) events from both **Application Gateway WAF** and **Azure Front Door WAF** in a single pane. Displays blocked and detected rule hits with client IP, request URI, matched rule, and rule set details. Includes an optional section to trigger a Logic App playbook directly on a selected WAF event.
 
-- You can **view Sentinel workbooks in the Microsoft Defender portal**, but **editing/creating** capabilities may still require the **Azure portal experience** depending on your tenant and feature state. [3](https://techcommunity.microsoft.com/blog/microsoftsentinelblog/whats-new-view-microsoft-sentinel-workbooks-directly-from-unified-soc-operations/4356094) [2](https://learn.microsoft.com/en-us/azure/sentinel/monitor-your-data)  
-- Microsoft has announced a transition where Sentinel’s Azure portal experience is being retired in favor of the Defender portal (plan accordingly if your org is standardizing). [2](https://learn.microsoft.com/en-us/azure/sentinel/monitor-your-data)  
+**Data sources required:**
+- `AzureDiagnostics` – WAF diagnostic logs from Application Gateway (`ApplicationGatewayFirewall` category) and/or Front Door (`FrontDoorWebApplicationFirewallLog` category) must be streamed to your Log Analytics workspace.
 
----
+**Permissions required:**
 
-## Option A (Recommended): Import via Microsoft Sentinel → Workbooks → Advanced Editor
+| Role | Scope | Purpose |
+|---|---|---|
+| **Workbook Contributor** (or Owner/Contributor) | Resource group | Deploy and save the workbook |
+| **Log Analytics Reader** | Log Analytics workspace | Query WAF diagnostic data |
+| **Logic App Contributor** *(optional)* | Logic App resource group | Use the Run Playbook feature |
 
-Use this method when you want to quickly import a workbook JSON from GitHub.
+**Deploy to Azure (ARM template):**
 
-### Step-by-step
+[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FAttacktheSOC%2FAzure-SecOps%2Fmain%2FSentinel%2FWorkbooks%2FModified%2520WAF%2520Events%2520playbook.json)
 
-1. **Open the workbook JSON in GitHub**
-   - Browse to this repo’s workbook JSON file, then select **RAW** to view the full JSON content. [1](https://github.com/AttacktheSOC/Azure-SecOps) [4](https://charbelnemnom.com/import-export-share-workbooks-in-azure-sentinel/)  
+The template accepts four parameters:
 
-2. **Copy the JSON**
-   - In the RAW view, select all (`Ctrl + A`) and copy (`Ctrl + C`). [4](https://charbelnemnom.com/import-export-share-workbooks-in-azure-sentinel/)  
+| Parameter | Default | Notes |
+|---|---|---|
+| `workbookDisplayName` | `Modified WAF Workbook` | Friendly name shown in the workbook gallery |
+| `workbookType` | `sentinel` | Gallery type; keep as `sentinel` for Sentinel workbooks |
+| `workbookSourceId` | placeholder workspace resource ID | **Replace** with your Log Analytics workspace resource ID |
+| `workbookId` | `[newGuid()]` | Leave as default to auto-generate |
 
-3. **Open Sentinel Workbooks**
-   - Azure portal → **Microsoft Sentinel** → select your workspace → **Workbooks** (under Threat Management). [2](https://learn.microsoft.com/en-us/azure/sentinel/monitor-your-data) [4](https://charbelnemnom.com/import-export-share-workbooks-in-azure-sentinel/)  
-
-4. **Create a new workbook**
-   - Select **+ Add workbook**. [4](https://charbelnemnom.com/import-export-share-workbooks-in-azure-sentinel/)  
-
-5. **Open Advanced Editor**
-   - Select **Edit** (pencil icon), then select the **</> Advanced Editor** button. [4](https://charbelnemnom.com/import-export-share-workbooks-in-azure-sentinel/)  
-
-6. **Paste JSON and Apply**
-   - Delete the default template JSON, paste the copied workbook JSON, then select **Apply**. [4](https://charbelnemnom.com/import-export-share-workbooks-in-azure-sentinel/)  
-
-7. **Save the workbook**
-   - Give it a name and save it to the appropriate **subscription/resource group/location**.
-   - Choose **Shared** vs **My reports** based on whether you want others to access it. [4](https://charbelnemnom.com/import-export-share-workbooks-in-azure-sentinel/) [2](https://learn.microsoft.com/en-us/azure/sentinel/monitor-your-data)  
+**Post-deployment steps:**
+1. Ensure WAF diagnostic logs are routed to your Log Analytics workspace (Application Gateway / Front Door → Diagnostic settings → send `ApplicationGatewayFirewall` or `FrontDoorWebApplicationFirewallLog` to your workspace).
+2. Open the workbook and select your subscription and workspace in the parameter dropdowns.
+3. *(Optional)* To use **Run Playbook**: toggle on the "Run Playbook on selection?" parameter, then specify the resource group, Logic App name, and trigger name. Only Logic Apps with an **incident trigger** are supported.
 
 ---
 
-## Common Troubleshooting
+### 2. Sentinel Table Retention – Decouple Total Retention
 
-- **“No data” tiles**
-  - Confirm the workbook’s data sources are connected and the tables referenced in KQL exist in your workspace (or adjust queries/parameters). [2](https://learn.microsoft.com/en-us/azure/sentinel/monitor-your-data)  
+**File:** `TableManager.workbook` (raw workbook JSON – import via Advanced Editor)
 
-- **Permission errors**
-  - Ensure you have **Workbook Contributor** (or equivalent) on the workspace resource group to save/edit. [2](https://learn.microsoft.com/en-us/azure/sentinel/monitor-your-data)  
+**Description:** Operational workbook for managing Log Analytics table retention settings. Lists all tables in a selected workspace with their current analytics retention, total retention, archive retention, and whether total retention is coupled to the workspace default (`totalRetentionInDaysAsDefault`). Clicking a table name fires an ARM `PUT` to set `totalRetentionInDaysAsDefault = false` for that table, decoupling it from the workspace default while preserving the existing `totalRetentionInDays` value.
 
-- **KQL failures after import**
-  - Some workbooks expect specific solutions/connectors/content hub items; update table names, workspace parameters, or time ranges as needed. [2](https://learn.microsoft.com/en-us/azure/sentinel/monitor-your-data)  
+**Data sources required:**
+- Azure Resource Graph (subscription/workspace discovery)
+- ARM API – `Microsoft.OperationalInsights/workspaces/{name}/tables` (read and write)
+
+**Permissions required:**
+
+| Role | Scope | Purpose |
+|---|---|---|
+| **Workbook Contributor** (or Owner/Contributor) | Resource group | Save the workbook |
+| **Log Analytics Contributor** | Log Analytics workspace | Read table metadata and issue ARM `PUT` to update table retention |
+
+> A custom role with `microsoft.operationalinsights/workspaces/tables/read` and `microsoft.operationalinsights/workspaces/tables/write` is sufficient if you prefer least-privilege.
+
+**Deployment – Advanced Editor import:**
+
+This file is a raw workbook JSON (not an ARM template) and must be imported manually.
+
+1. Open the [raw file](https://raw.githubusercontent.com/AttacktheSOC/Azure-SecOps/main/Sentinel/Workbooks/TableManager.workbook) and copy the entire contents (`Ctrl+A`, `Ctrl+C`).
+2. Azure portal → **Microsoft Sentinel** → your workspace → **Workbooks** → **+ Add workbook**.
+3. Select **Edit** (pencil icon) → **`</> Advanced Editor`**.
+4. Replace the default JSON with the copied content → **Apply** → **Save**.
+5. Set a name, subscription, resource group, and location, then save as **Shared**.
+
+**Post-deployment steps:**
+1. In the workbook, select your **Subscription** and **Workspace**.
+2. Wait for the table list to populate (ARM query may take a few seconds).
+3. Click any **TableName** link to open the decoupling confirmation blade and confirm.
+4. The `TotalRetentionInDaysAsDefault` column updates after ~60–120 seconds; refresh the workbook to verify.
+
+> **Note:** The ARM API version field defaults to `2025-07-01`. If that version is unsupported in your environment, update it to the latest stable `Microsoft.OperationalInsights` API version.
 
 ---
 
-## Updating Workbooks from This Repo
+## General Prerequisites
 
-- Re-import the updated JSON using the same **Advanced Editor** flow, or use ARM-based deployments for consistent versioning. [4](https://charbelnemnom.com/import-export-share-workbooks-in-azure-sentinel/) [5](https://learn.microsoft.com/en-us/azure/azure-monitor/visualize/workbooks-automate)  
-- Consider keeping a small changelog in your environment to track which workbook version is deployed where. [5](https://learn.microsoft.com/en-us/azure/azure-monitor/visualize/workbooks-automate)  
+- A Microsoft Sentinel-enabled Log Analytics workspace.
+- Azure portal access (workbook editing is not available in the Defender portal).
+- At minimum **Workbook Reader** to view an existing shared workbook; **Workbook Contributor** to create or edit.
 
----
+## Troubleshooting
+
+| Symptom | Fix |
+|---|---|
+| "No data" on WAF tiles | Confirm WAF diagnostic logs are connected and the `AzureDiagnostics` table exists in your workspace |
+| ARM action fails in TableManager | Confirm your account has `microsoft.operationalinsights/workspaces/tables/write` on the workspace |
+| Tables not loading in TableManager | Verify the selected Subscription/Workspace parameters are correct and you have read access to the workspace |
+| KQL errors after import | Check that required data connectors and solutions are enabled; adjust table names or time ranges as needed |
 
 ## References
 
-- Repo: https://github.com/AttacktheSOC/Azure-SecOps [1](https://github.com/AttacktheSOC/Azure-SecOps)  
-- Microsoft Learn: Visualize and monitor your data by using workbooks in Microsoft Sentinel [2](https://learn.microsoft.com/en-us/azure/sentinel/monitor-your-data)  
-- Guide: Import/Export/Share Workbooks in Microsoft Sentinel (Advanced Editor steps) [4](https://charbelnemnom.com/import-export-share-workbooks-in-azure-sentinel/)  
-- Microsoft Learn: Programmatically manage workbooks (ARM templates) [5](https://learn.microsoft.com/en-us/azure/azure-monitor/visualize/workbooks-automate)  
-- Microsoft Sentinel blog: View workbooks in Defender portal [3](https://techcommunity.microsoft.com/blog/microsoftsentinelblog/whats-new-view-microsoft-sentinel-workbooks-directly-from-unified-soc-operations/4356094)  
+- [Visualize and monitor data with workbooks in Microsoft Sentinel](https://learn.microsoft.com/en-us/azure/sentinel/monitor-your-data)
+- [Programmatically manage Azure Monitor workbooks](https://learn.microsoft.com/en-us/azure/azure-monitor/visualize/workbooks-automate)
+- [Log Analytics tables API reference](https://learn.microsoft.com/en-us/rest/api/loganalytics/tables)
