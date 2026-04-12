@@ -33,7 +33,7 @@ The template accepts four parameters:
 |---|---|---|
 | `workbookDisplayName` | `Modified WAF Workbook` | Friendly name shown in the workbook gallery |
 | `workbookType` | `sentinel` | Gallery type; keep as `sentinel` for Sentinel workbooks |
-| `workbookSourceId` | placeholder workspace resource ID | **Replace** with your Log Analytics workspace resource ID |
+| `workbookSourceId` | placeholder workspace resource ID | **Replace** with your Log Analytics workspace resource ID (format: `/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.OperationalInsights/workspaces/{workspaceName}`) |
 | `workbookId` | `[newGuid()]` | Leave as default to auto-generate |
 
 **Post-deployment steps:**
@@ -60,7 +60,7 @@ The template accepts four parameters:
 | **Workbook Contributor** (or Owner/Contributor) | Resource group | Save the workbook |
 | **Log Analytics Contributor** | Log Analytics workspace | Read table metadata and issue ARM `PUT` to update table retention |
 
-> A custom role with `microsoft.operationalinsights/workspaces/tables/read` and `microsoft.operationalinsights/workspaces/tables/write` is sufficient if you prefer least-privilege.
+> A custom role with `Microsoft.OperationalInsights/workspaces/tables/read` and `Microsoft.OperationalInsights/workspaces/tables/write` is sufficient if you prefer least-privilege.
 
 **Deployment – Advanced Editor import:**
 
