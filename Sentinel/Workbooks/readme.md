@@ -14,6 +14,7 @@ Microsoft Sentinel workbook templates for visualizing and operating on workspace
 
 **Data sources required:**
 - `AzureDiagnostics` – WAF diagnostic logs from Application Gateway (`ApplicationGatewayFirewall` category) and/or Front Door (`FrontDoorWebApplicationFirewallLog` category) must be streamed to your Log Analytics workspace.
+- `FakeData` - This workbook contains an auto-generated table of fake logs to ensure you can follow the blog post: [Operational Workbooks - AttacktheSOC.com](https://attackthesoc.com/posts/operational-workbooks-ep1)
 
 **Permissions required:**
 
